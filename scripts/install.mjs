@@ -6,12 +6,12 @@ import { fileURLToPath } from "url";
 
 // Get the absolute path to the script directory
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const GITHUB_REPO = "https://github.com/zama-ai/fhevm-hardhat-template.git";
+const GITHUB_REPO = "git@github.com:pdroalves/farewell.git";
 
 // Path to the packages directory
 const packagesDir = path.join(SCRIPT_DIR, "../packages");
 // <root>/packages/fhevm-hardhat-template
-const TARGET_DIR = path.join(packagesDir, "fhevm-hardhat-template");
+const TARGET_DIR = path.join(packagesDir, "farewell");
 // <root>/packages/site
 const SITE_DIR = path.join(packagesDir, "site");
 
@@ -57,7 +57,7 @@ export async function npmInstall() {
   }
 }
 
-export async function installFhevmHardhatTemplate() {
+export async function installFarewell() {
   // Exit if ./packages does not exist
   checkDir(packagesDir);
 
@@ -87,8 +87,8 @@ export async function installFhevmHardhatTemplate() {
 }
 
 export async function install() {
-  // git clone "https://github.com/zama-ai/fhevm-hardhat-template.git" into <root>/packages
-  await installFhevmHardhatTemplate();
+  // git clone "git@github.com:pdroalves/farewell.git" into <root>/packages
+  await installFarewell();
   // npm install
   await npmInstall();
 }
