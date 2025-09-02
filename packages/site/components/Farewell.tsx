@@ -1,199 +1,399 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { isHex } from "viem";
+import { useFhevm } from "@/fhevm/useFhevm";
+import { useInMemoryStorage } from "../hooks/useInMemoryStorage";
+import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSigner";
 import { useFarewell } from "@/hooks/useFarewell";
+import { FhevmDecryptionSignature } from "@/fhevm/FhevmDecryptionSignature";
+import { ethers } from "ethers";
+import { FhevmType } from "@fhevm/hardhat-plugin";
+import { FarewellAddresses } from "@/abi/FarewellAddresses";
 
-function fmt(a?: string | null) {
-  if (!a) return "";
-  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+// Type-safe helpers
+function toHex32(value: bigint): `0x${string}` {
+  return ethers.toBeHex(value, 32); // 32-byte padded hex
+}
+
+function parseSkShare(value: unknown): { dec: string; hex: `0x${string}` } {
+  if (typeof value === "bigint") {
+    return { dec: value.toString(10), hex: toHex32(value) };
+  }
+  if (typeof value === "string" && value.startsWith("0x")) {
+    // hex -> bigint
+    const bi = BigInt(value);
+    return {
+      dec: bi.toString(10),
+      hex: ethers.hexlify(
+        ethers.zeroPadValue(value as `0x${string}`, 32)
+      ) as `0x${string}`,
+    };
+  }
+  if (typeof value === "number") {
+    const bi = BigInt(value);
+    return { dec: bi.toString(10), hex: toHex32(bi) };
+  }
+  // fallback
+  const s = String(value ?? "");
+  return { dec: s, hex: s as any };
 }
 
 export default function Farewell() {
+  const { storage: fhevmDecryptionSignatureStorage } = useInMemoryStorage();
   const {
-    // wallet
-    isConnected,
-    accountAddress,
-    connectWallet,
-    // meta
-    contractAddress,
+    provider,
     chainId,
-    // UX
-    message,
-    isBusy,
-    // actions
-    register,
-    registerWithParams,
-    ping,
-    addMessage,
-    claim,
-    // reads
-    messageCount,
-    retrieve,
-  } = useFarewell();
+    accounts,
+    isConnected,
+    connect,
+    ethersSigner,
+    ethersReadonlyProvider,
+    sameChain,
+    sameSigner,
+    initialMockChains,
+  } = useMetaMaskEthersSigner();
 
-  // hydration guard: render placeholders until mounted so SSR/CSR match
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // FHEVM instance
+  const {
+    instance: fhevmInstance,
+    status: fhevmStatus,
+    error: fhevmError,
+  } = useFhevm({
+    provider,
+    chainId,
+    initialMockChains,
+    enabled: true,
+  });
+  const fhevmReady = fhevmStatus === "ready" && !!fhevmInstance;
 
-  // form state
+  // Farewell hook
+  const farewell = useFarewell({
+    instance: fhevmInstance,
+    fhevmDecryptionSignatureStorage,
+    chainId,
+    ethersSigner,
+    ethersReadonlyProvider,
+    sameChain,
+    sameSigner,
+  });
+
+  // form state// form state
+  const [showDetails, setShowDetails] = useState(false); // hide chain/status cards by default
+
   const [email, setEmail] = useState("");
-  const [skShare, setSkShare] = useState("42");
-  const [payload, setPayload] = useState<string>("hello");
+  const [skShare, setSkShare] = useState("");
+  const [payload, setPayload] = useState<string>("");
   const [publicMessage, setPublicMessage] = useState("");
+  // markDeceased input (allow empty string for UX)
+  const [deceasedTarget, setDeceasedTarget] = useState<`0x${string}` | "">("");
+  // Claim / Retrieve inputs
+  const [claimOwner, setClaimOwner] = useState<`0x${string}` | "">("");
+  const [claimIndex, setClaimIndex] = useState("0");
 
-  const [owner, setOwner] =
-    useState<`0x${string}`>("0x0000000000000000000000000000000000000000");
-  const [index, setIndex] = useState("0");
+  const [retrieveOwner, setRetrieveOwner] = useState<`0x${string}` | "">("");
+  const [retrieveIndex, setRetrieveIndex] = useState("0");
+
+  // Retrieve outputs (read-only boxes)
+  const [retrievedSkShare, setRetrievedSkShare] = useState<
+    string | bigint | boolean
+  >();
+  const [retrievedEmailLen, setRetrievedEmailLen] = useState<string>("");
+  const [retrievedLimbCount, setRetrievedLimbCount] = useState<string>("");
+  const [retrievedPayloadHex, setRetrievedPayloadHex] = useState("");
+  const [retrievedPayloadUtf8, setRetrievedPayloadUtf8] = useState("");
+  const [retrievedPubMsg, setRetrievedPubMsg] = useState("");
+
+  // Recipient email (decrypted)
+  const [retrievedRecipientEmail, setRetrievedRecipientEmail] = useState("");
+
+  // registration inputs (prefilled)
+  const [checkInDays, setCheckInDays] = useState("30");
+  const [graceDays, setGraceDays] = useState("7");
 
   const [lastCount, setLastCount] = useState<string>("");
-  const [lastRetrieve, setLastRetrieve] = useState<string>("");
 
-  const guard = async (fn: () => Promise<any>) => {
-    if (!isConnected) {
-      await connectWallet().catch((e) => {
-        alert(String(e?.message ?? e));
-      });
-    }
-    return fn();
-  };
+  // === Style tokens (Tailwind) ==============================================
+  const cardClass =
+    "rounded-2xl border border-slate-200 bg-slate-50/80 backdrop-blur-sm shadow-sm p-5";
+  const sectionClass =
+    "rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3";
+  const titleClass = "font-semibold text-slate-800 text-lg";
+  const inputClass =
+    "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 " +
+    "focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
+  const inputReadonlyClass =
+    "w-40 rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 font-mono text-slate-800";
+  const labelClass = "text-sm font-medium text-slate-600 mb-1";
+  const btnPrimary =
+    "inline-flex items-center rounded-xl bg-sky-600 px-4 py-2 font-semibold text-white shadow-sm " +
+    "hover:bg-sky-700 disabled:opacity-50 disabled:pointer-events-none " +
+    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500";
+  const btnSecondary =
+    "inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-slate-700 " +
+    "hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none " +
+    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300";
+
+  if (!isConnected) {
+    return (
+      <div className="mx-auto max-w-md p-8">
+        <div className={cardClass + " text-center"}>
+          <h1 className="text-2xl font-bold text-slate-800 mb-4">
+            Connect your wallet
+          </h1>
+          <button className={btnPrimary + " w-full"} onClick={connect}>
+            <span className="text-base">Connect to MetaMask</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (farewell.isDeployed === false) {
+    return (
+      <div className="mx-auto max-w-3xl p-6">
+        <div className={cardClass}>
+          <p className="text-slate-800">
+            Farewell is not deployed on chain{" "}
+            <span className="font-mono">{chainId}</span>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Pick friendly name for current account
+  // Friendly greeting name
+// --- Friendly name mapping (robust) ---
+const normalizeEvm = (addr?: string) => {
+  try {
+    return ethers.getAddress((addr ?? "").trim());
+  } catch {
+    return "";
+  }
+};
+
+const connectedRaw = (accounts?.[0] ?? "").trim();
+const connectedEvm = normalizeEvm(connectedRaw);
+
+// Known IDs (normalize EVM ones)
+const ALICE_EVM = normalizeEvm("0x89b91f8f6A90E7460fe5E62Bcd6f50e74f2e46D4");
+const BOB_EVM   = normalizeEvm("0xF21D8d19E0De068076851A7BC26d0d57fE670Ae4");
+const CHARLIE_EVM = normalizeEvm("0xc674BB946782992C7C869dCb514a3AfeBD575564");
+
+let friendlyName: string | null = null;
+
+if (connectedEvm && (connectedEvm === ALICE_EVM)) {
+  friendlyName = "Alice";
+} else if (connectedEvm && (connectedEvm === BOB_EVM)) {
+  friendlyName = "Bob";
+} else if (connectedEvm && (connectedEvm === CHARLIE_EVM)) {
+  friendlyName = "Charlie";
+}
 
   return (
-    <div className="mx-auto max-w-3xl p-6 space-y-8">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Farewell</h1>
-          <p className="text-sm opacity-70">
-            Contract:{" "}
-            {/* Always render the same tag; swap text only after mount */}
-            <span className="font-mono" suppressHydrationWarning>
-              {mounted ? (contractAddress ? fmt(contractAddress) : "not found") : "…"}
-            </span>
-          </p>
-          <p className="text-xs opacity-60">
-            Chain:{" "}
-            <span suppressHydrationWarning>
-              {mounted ? (chainId ?? "unknown") : "…"}
-            </span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {mounted ? (
-            isConnected ? (
-              <span
-                className="px-3 py-1 rounded-lg bg-green-800 text-green-100 text-sm"
-                suppressHydrationWarning
-              >
-                {fmt(accountAddress ?? "")}
-              </span>
-            ) : (
-              <button
-                onClick={() =>
-                  connectWallet().catch((e) => alert(String(e?.message ?? e)))
-                }
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-              >
-                Connect Wallet
-              </button>
-            )
-          ) : (
-            // Same element on server & first client render to avoid mismatch
-            <button className="px-4 py-2 rounded-xl bg-blue-600/50 text-white cursor-not-allowed">
-              Connect Wallet
-            </button>
-          )}
-        </div>
-      </header>
+    <div className="mx-auto max-w-7xl p-6 space-y-6">
+      {/* Toggle button */}
+      <div className="flex justify-end">
+        <button
+          className={btnSecondary}
+          onClick={() => setShowDetails(!showDetails)}
+        >
+          {showDetails ? "Hide chain / status" : "Show chain / status"}
+        </button>
+      </div>
 
-      {message && (
-        <div className="rounded-xl border border-white/10 p-3 text-sm bg-white/5">
-          {message}
-        </div>
+      {showDetails && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className={cardClass + " lg:col-span-8"}>
+              <p className={titleClass}>Chain & Wallet</p>
+              {printProperty("ChainId", chainId)}
+              {printProperty(
+                "Metamask accounts",
+                accounts
+                  ? accounts.length === 0
+                    ? "No accounts"
+                    : `{ length: ${accounts.length}, [${accounts[0]}, ...] }`
+                  : "undefined"
+              )}
+              {printProperty(
+                "Signer",
+                ethersSigner ? accounts?.[0] : "No signer"
+              )}
+              <div className="mt-3 h-px bg-slate-200" />
+              <div className="mt-3">
+                {printProperty("Contract", farewell.contractAddress)}
+              </div>
+              {printBooleanProperty("isDeployed", Boolean(farewell.isDeployed))}
+            </div>
+
+            <div className={cardClass + " lg:col-span-4"}>
+              <p className={titleClass}>Status</p>
+              {printProperty(
+                "Fhevm Instance",
+                fhevmInstance ? "OK" : "undefined"
+              )}
+              {printProperty("Fhevm Status", fhevmStatus)}
+              {printProperty("Fhevm Error", fhevmError ?? "No Error")}
+              {printProperty("isBusy", farewell.isBusy)}
+            </div>
+          </div>
+
+          {farewell.message && (
+            <div className={cardClass}>
+              <p className="text-sm text-slate-700">{farewell.message}</p>
+            </div>
+          )}
+        </>
       )}
 
-      <section className="rounded-2xl border border-white/10 p-4 space-y-3">
-        <h2 className="text-xl font-semibold">Register / Ping</h2>
-        <div className="flex gap-2 flex-wrap">
+      {friendlyName && (
+        <div className="text-xl font-semibold text-slate-800">
+          Hello, {friendlyName}!
+        </div>
+      )}
+      {/* Register / Ping */}
+      <section className={sectionClass}>
+        <h2 className="text-xl font-semibold text-slate-800">
+          Register / Ping
+        </h2>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col">
+            <label className={labelClass}>Check-in (days)</label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              className={inputClass + " w-36"}
+              value={checkInDays}
+              onChange={(e) => setCheckInDays(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>Grace (days)</label>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              className={inputClass + " w-36"}
+              value={graceDays}
+              onChange={(e) => setGraceDays(e.target.value)}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              disabled={farewell.isBusy || !isConnected}
+              onClick={() => {
+                const dToSec = (d: string) =>
+                  BigInt(Math.max(0, Number(d || 0))) * 24n * 60n * 60n;
+                const checkInSec = dToSec(checkInDays);
+                const graceSec = dToSec(graceDays);
+                farewell
+                  .registerWithParams(checkInSec, graceSec)
+                  .catch((e) => alert(String(e?.message ?? e)));
+              }}
+              className={btnPrimary}
+            >
+              register
+            </button>
+
+            <button
+              disabled={farewell.isBusy || !isConnected}
+              onClick={() =>
+                farewell.ping().catch((e) => alert(String(e?.message ?? e)))
+              }
+              className={btnSecondary}
+            >
+              ping()
+            </button>
+          </div>
+        </div>
+
+        <h2 className="text-xl font-semibold text-slate-800">Message Count</h2>
+        <div className="flex items-center gap-3">
           <button
-            disabled={!mounted || isBusy}
+            disabled={farewell.isBusy || !fhevmReady}
             onClick={() =>
-              guard(register).catch((e) => alert(String(e?.message ?? e)))
+              farewell
+                .messageCount()
+                .then((n) => setLastCount(n.toString()))
+                .catch((e) => alert(String(e?.message ?? e)))
             }
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            className={btnPrimary}
           >
-            register()
+            Count
           </button>
-          <button
-            disabled={!mounted || isBusy}
-            onClick={() =>
-              guard(() =>
-                registerWithParams(30n * 24n * 60n * 60n, 7n * 24n * 60n * 60n)
-              ).catch((e) => alert(String(e?.message ?? e)))
-            }
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5 disabled:opacity-50"
-          >
-            register(30d, 7d)
-          </button>
-          <button
-            disabled={!mounted || isBusy}
-            onClick={() =>
-              guard(ping).catch((e) => alert(String(e?.message ?? e)))
-            }
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5 disabled:opacity-50"
-          >
-            ping()
-          </button>
+
+          <input
+            className={inputReadonlyClass}
+            value={lastCount || ""}
+            onChange={() => {}}
+            readOnly
+            placeholder="—"
+            aria-label="messageCount result"
+          />
         </div>
       </section>
 
-      <section className="rounded-2xl border border-white/10 p-4 space-y-3">
-        <h2 className="text-xl font-semibold">Add Message</h2>
+      {/* Add Message */}
+      <section className={sectionClass}>
+        <h2 className="text-xl font-semibold text-slate-800">Add Message</h2>
         <div className="grid gap-3">
           <input
-            className="rounded-xl border border-white/20 bg-transparent px-3 py-2"
+            className={inputClass}
             placeholder="recipient email (UTF-8)"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
           <input
-            className="rounded-xl border border-white/20 bg-transparent px-3 py-2"
+            className={inputClass}
             placeholder="skShare (e.g., 42)"
             inputMode="numeric"
             value={skShare}
             onChange={(e) => setSkShare(e.target.value)}
           />
           <textarea
-            className="rounded-xl border border-white/20 bg-transparent px-3 py-2"
+            className={inputClass + " min-h-[100px]"}
             placeholder="payload (string or 0x...)"
-            rows={3}
             value={payload}
             onChange={(e) => setPayload(e.target.value)}
           />
           <input
-            className="rounded-xl border border-white/20 bg-transparent px-3 py-2"
+            className={inputClass}
             placeholder="publicMessage (optional)"
             value={publicMessage}
             onChange={(e) => setPublicMessage(e.target.value)}
           />
+
           <div className="flex justify-end">
             <button
-              disabled={!mounted || isBusy}
+              disabled={farewell.isBusy || !fhevmReady}
               onClick={() =>
-                guard(async () => {
+                (async () => {
                   const share = BigInt(skShare);
                   const payloadValue = isHex(payload as any)
                     ? (payload as `0x${string}`)
                     : payload;
-                  await addMessage(
+
+                  const { txHash, receipt } = await farewell.addMessage(
                     email,
                     share,
                     payloadValue,
                     publicMessage.trim() ? publicMessage : undefined
                   );
-                  alert("Message added.");
-                }).catch((e) => alert(String(e?.message ?? e)))
+
+                  alert(
+                    `Message added ✅\nTx: ${txHash}\nBlock: ${receipt.blockNumber}`
+                  );
+                })().catch((e) =>
+                  alert(`Add Message failed:\n${String(e?.message ?? e)}`)
+                )
               }
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+              className={btnPrimary}
             >
               Add Message
             </button>
@@ -201,80 +401,384 @@ export default function Farewell() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-white/10 p-4 space-y-3">
-        <h2 className="text-xl font-semibold">Claim &amp; Retrieve</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <input
-            className="rounded-xl border border-white/20 bg-transparent px-3 py-2 font-mono"
-            placeholder="owner 0x..."
-            value={owner}
-            onChange={(e) => setOwner(e.target.value as `0x${string}`)}
-          />
-          <input
-            className="rounded-xl border border-white/20 bg-transparent px-3 py-2"
-            placeholder="index (e.g., 0)"
-            inputMode="numeric"
-            value={index}
-            onChange={(e) => setIndex(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2">
-          <button
-            disabled={!mounted || isBusy}
-            onClick={() =>
-              guard(() => claim(owner, BigInt(index)))
-                .then(() => alert("Claim tx sent."))
-                .catch((e) => alert(String(e?.message ?? e)))
-            }
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            Claim
-          </button>
-          <button
-            disabled={!mounted || isBusy}
-            onClick={() =>
-              retrieve(owner, BigInt(index))
-                .then((res) =>
-                  setLastRetrieve(
-                    JSON.stringify(
-                      res,
-                      (_k, v) => (typeof v === "bigint" ? v.toString() : v),
-                      2
-                    )
-                  )
-                )
-                .catch((e) => alert(String(e?.message ?? e)))
-            }
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5 disabled:opacity-50"
-          >
-            Retrieve
-          </button>
-          <button
-            disabled={!mounted || isBusy}
-            onClick={() =>
-              messageCount(owner)
-                .then((n) => setLastCount(n.toString()))
-                .catch((e) => alert(String(e?.message ?? e)))
-            }
-            className="px-4 py-2 rounded-xl border border-white/20 hover:bg-white/5 disabled:opacity-50"
-          >
-            Count
-          </button>
+      <section className={sectionClass}>
+        <h2 className="text-xl font-semibold text-slate-800">Mark Deceased</h2>
+
+        <div className="text-sm text-slate-600">
+          Anyone can mark a user as deceased after their check-in + grace period
+          has elapsed. Leave the address empty to use your connected account.
         </div>
 
-        {lastCount && (
-          <p className="text-sm opacity-80 mt-2">
-            messageCount: <span className="font-mono">{lastCount}</span>
-          </p>
-        )}
-
-        {lastRetrieve && (
-          <div className="mt-3 rounded-xl border border-white/10 p-3 bg-white/5">
-            <h3 className="font-semibold mb-2">DeliveryPackage</h3>
-            <pre className="whitespace-pre-wrap text-xs">{lastRetrieve}</pre>
+        <div className="grid gap-3 md:grid-cols-[1fr_auto] items-end mt-2">
+          <div className="flex flex-col">
+            <label className={labelClass}>Target user (0x…)</label>
+            <input
+              className={inputClass + " font-mono"}
+              placeholder={accounts?.[0] ?? "0x0000…"}
+              value={deceasedTarget}
+              onChange={(e) =>
+                setDeceasedTarget(e.target.value as `0x${string}`)
+              }
+            />
           </div>
-        )}
+
+          <button
+            disabled={farewell.isBusy || !isConnected}
+            onClick={() =>
+              farewell
+                .markDeceased(deceasedTarget || undefined)
+                .catch((e) => alert(String(e?.message ?? e)))
+            }
+            className={btnPrimary}
+          >
+            markDeceased()
+          </button>
+        </div>
       </section>
+
+      <section className={sectionClass}>
+        <h2 className="text-xl font-semibold text-slate-800">Claim</h2>
+
+        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end">
+          <div className="flex flex-col">
+            <label className={labelClass}>Owner (0x…)</label>
+            <input
+              className={inputClass + " font-mono"}
+              placeholder={accounts?.[0] ?? "0x0000…"}
+              value={claimOwner}
+              onChange={(e) => setClaimOwner(e.target.value as `0x${string}`)}
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>Index</label>
+            <input
+              className={inputClass + " w-28"}
+              inputMode="numeric"
+              value={claimIndex}
+              onChange={(e) => setClaimIndex(e.target.value)}
+            />
+          </div>
+
+          <button
+            disabled={farewell.isBusy || !isConnected}
+            onClick={() => {
+              const owner = (claimOwner ||
+                (accounts?.[0] as `0x${string}`)) as `0x${string}`;
+              if (!owner) {
+                alert("Provide an owner address or connect your wallet");
+                return;
+              }
+              const idx = BigInt(claimIndex || "0");
+              farewell
+                .claim(owner, idx)
+                .then(() => alert("Claim tx sent."))
+                .catch((e) => alert(String(e?.message ?? e)));
+            }}
+            className={btnPrimary}
+          >
+            claim()
+          </button>
+        </div>
+      </section>
+      <section className={sectionClass}>
+        <h2 className="text-xl font-semibold text-slate-800">Retrieve</h2>
+
+        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end">
+          <div className="flex flex-col">
+            <label className={labelClass}>Target address (0x…)</label>
+            <input
+              className={inputClass + " font-mono"}
+              placeholder={accounts?.[0] ?? "0x0000…"}
+              value={retrieveOwner}
+              onChange={(e) =>
+                setRetrieveOwner(e.target.value as `0x${string}`)
+              }
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>Index</label>
+            <input
+              className={inputClass + " w-28"}
+              inputMode="numeric"
+              value={retrieveIndex}
+              onChange={(e) => setRetrieveIndex(e.target.value)}
+            />
+          </div>
+
+          <button
+            disabled={farewell.isBusy || !isConnected}
+            onClick={() =>
+              (async () => {
+                const owner = (retrieveOwner ||
+                  (accounts?.[0] as `0x${string}`)) as `0x${string}`;
+                if (!owner) {
+                  alert("Provide an owner address or connect your wallet");
+                  return;
+                }
+                const idx = BigInt(retrieveIndex || "0");
+                const res = await farewell.retrieve(owner, idx);
+
+                // Always show raw payload/pm first
+                setRetrievedPayloadHex(res.payload);
+                try {
+                  setRetrievedPayloadUtf8(
+                    res.payload?.startsWith("0x")
+                      ? ethers.toUtf8String(res.payload as `0x${string}`)
+                      : String(res.payload ?? "")
+                  );
+                } catch {
+                  setRetrievedPayloadUtf8("Couldn't decode as UTF-8");
+                }
+                setRetrievedPubMsg(res.publicMessage ?? "");
+                setRetrievedEmailLen(String(res.emailByteLen));
+                setRetrievedLimbCount(
+                  Array.isArray((res as any).encodedRecipientEmail)
+                    ? String(
+                        ((res as any).encodedRecipientEmail as unknown[]).length
+                      )
+                    : "0"
+                );
+                const sk = parseSkShare((res as any).skShare);
+                // Decrypt skShare and recipient email if FHEVM is ready & signer present
+                if (
+                  !fhevmReady ||
+                  !fhevmInstance ||
+                  !ethersSigner ||
+                  !farewell.contractAddress
+                ) {
+                  return; // show lengths; user can still see raw data
+                }
+                setRetrievedSkShare("Decrypting...");
+                setRetrievedRecipientEmail("Decrypting..."); // reset
+
+                try {
+                  const sig = await FhevmDecryptionSignature.loadOrSign(
+                    fhevmInstance,
+                    [farewell.contractAddress as `0x${string}`],
+                    ethersSigner,
+                    fhevmDecryptionSignatureStorage
+                  );
+
+                  if (!sig) {
+                    setRetrievedRecipientEmail(
+                      "(decryption signature unavailable)"
+                    );
+                    setRetrievedSkShare("(decryption signature unavailable)");
+                    return;
+                  }
+
+                  const limbsHandles = (res as any)
+                    .encodedRecipientEmail as `0x${string}`[];
+                  if (
+                    !Array.isArray(limbsHandles) ||
+                    limbsHandles.length === 0
+                  ) {
+                    setRetrievedRecipientEmail("(no limbs)");
+                    return;
+                  }
+
+                  // Build decrypt tasks and run
+                  const emailTasks = limbsHandles.map((h) => ({
+                    handle: h,
+                    contractAddress: farewell.contractAddress as `0x${string}`,
+                  }));
+
+                  const emailDecMap = await fhevmInstance.userDecrypt(
+                    emailTasks,
+                    sig.privateKey,
+                    sig.publicKey,
+                    sig.signature,
+                    sig.contractAddresses,
+                    sig.userAddress,
+                    sig.startTimestamp,
+                    sig.durationDays
+                  );
+
+                  // Recompose UTF-8 from 32-byte big-endian limbs
+                  const bytes: number[] = [];
+                  for (const h of limbsHandles) {
+                    const clear = emailDecMap[h] as bigint;
+                    const limbHex = ethers.toBeHex(clear, 32);
+                    const limbBytes = Array.from(ethers.getBytes(limbHex));
+                    bytes.push(...limbBytes);
+                  }
+                  const trimmed = bytes.slice(0, res.emailByteLen);
+                  let emailText = "";
+                  try {
+                    emailText = ethers.toUtf8String(new Uint8Array(trimmed));
+                  } catch {
+                    emailText = "(invalid UTF-8 after decryption)";
+                  }
+                  setRetrievedRecipientEmail(emailText);
+
+                  // Decrypt skShare
+                  const decSkShare = await fhevmInstance.userDecrypt(
+                    [
+                      {
+                        handle: (res as any).skShare as `0x${string}`,
+                        contractAddress: farewell.contractAddress,
+                      },
+                    ],
+                    sig.privateKey,
+                    sig.publicKey,
+                    sig.signature,
+                    sig.contractAddresses,
+                    sig.userAddress,
+                    sig.startTimestamp,
+                    sig.durationDays
+                  );
+                  console.log("decSkShare", decSkShare);
+                  setRetrievedSkShare(
+                    decSkShare[(res as any).skShare as `0x${string}`]
+                  );
+                } catch (e: any) {
+                  setRetrievedRecipientEmail(
+                    `(decrypt failed: ${String(e?.message ?? e)})`
+                  );
+                }
+              })().catch((e) => alert(String(e?.message ?? e)))
+            }
+            className={btnPrimary}
+          >
+            retrieve()
+          </button>
+        </div>
+
+        {/* Results */}
+        <div className="mt-4 grid gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex flex-col">
+              <label className={labelClass}>Recipient Email (decrypted)</label>
+              <input
+                className={inputReadonlyClass + " font-mono w-full"}
+                value={retrievedRecipientEmail}
+                readOnly
+                placeholder="— requires claim + FHEVM ready —"
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label className={labelClass}>Recipient Email (meta)</label>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  className={inputReadonlyClass}
+                  value={retrievedEmailLen}
+                  readOnly
+                  placeholder="byteLen"
+                  aria-label="email byte length"
+                />
+                <input
+                  className={inputReadonlyClass}
+                  value={retrievedLimbCount}
+                  readOnly
+                  placeholder="limbs"
+                  aria-label="limbs count"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>skShare</label>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                className={inputReadonlyClass}
+                value={retrievedSkShare}
+                readOnly
+                placeholder="shared secret"
+                aria-label="email byte length"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>payload (UTF-8, best effort)</label>
+            <textarea
+              className={inputReadonlyClass + " w-full min-h-[160px] resize-y"}
+              value={retrievedPayloadUtf8}
+              readOnly
+              placeholder="hidden message (as UTF-8, if possible)"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>payload (hex)</label>
+            <textarea
+              className={
+                inputReadonlyClass + " w-full min-h-[160px] font-mono resize-y"
+              }
+              value={retrievedPayloadHex}
+              readOnly
+              placeholder="hidden message (as hex)"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>publicMessage</label>
+            <textarea
+              className={inputReadonlyClass + " w-full min-h-[160px] resize-y"}
+              value={retrievedPubMsg}
+              readOnly
+              placeholder="—"
+            />
+          </div>
+        </div>
+      </section>
+
+      {!farewell.isDeployed && (
+        <p className="text-sm text-amber-600">
+          Farewell is not deployed for the current chain.
+        </p>
+      )}
     </div>
+  );
+}
+
+/* ——— Pretty property renderers ——— */
+
+function printProperty(name: string, value: unknown) {
+  let displayValue: string;
+
+  if (typeof value === "boolean") {
+    return printBooleanProperty(name, value);
+  } else if (typeof value === "string" || typeof value === "number") {
+    displayValue = String(value);
+  } else if (typeof value === "bigint") {
+    displayValue = String(value);
+  } else if (value === null) {
+    displayValue = "null";
+  } else if (value === undefined) {
+    displayValue = "undefined";
+  } else if (value instanceof Error) {
+    displayValue = value.message;
+  } else {
+    displayValue = JSON.stringify(value);
+  }
+
+  return (
+    <p className="text-slate-700">
+      <span className="text-slate-500">{name}:</span>{" "}
+      <span className="font-mono font-semibold text-slate-900">
+        {displayValue}
+      </span>
+    </p>
+  );
+}
+
+function printBooleanProperty(name: string, value: boolean) {
+  return (
+    <p className="text-slate-700">
+      <span className="text-slate-500">{name}:</span>{" "}
+      <span
+        className={
+          "font-mono font-semibold " +
+          (value ? "text-green-600" : "text-rose-600")
+        }
+      >
+        {String(value)}
+      </span>
+    </p>
   );
 }

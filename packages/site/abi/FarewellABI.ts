@@ -293,7 +293,7 @@ export const FarewellABI = {
       "inputs": [
         {
           "internalType": "address",
-          "name": "user",
+          "name": "owner",
           "type": "address"
         },
         {
