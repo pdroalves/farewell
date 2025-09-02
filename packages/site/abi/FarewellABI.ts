@@ -15,6 +15,31 @@ export const FarewellABI = {
           "type": "address"
         },
         {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "claimer",
+          "type": "address"
+        }
+      ],
+      "name": "Claimed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
           "indexed": false,
           "internalType": "uint64",
           "name": "when",
@@ -47,43 +72,6 @@ export const FarewellABI = {
         }
       ],
       "name": "MessageAdded",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "user",
-          "type": "address"
-        },
-        {
-          "indexed": true,
-          "internalType": "uint256",
-          "name": "index",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes",
-          "name": "recipientEmail",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "internalType": "bytes",
-          "name": "data",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "internalType": "euint128",
-          "name": "skShare",
-          "type": "bytes32"
-        }
-      ],
-      "name": "MessageClaimed",
       "type": "event"
     },
     {
@@ -139,14 +127,73 @@ export const FarewellABI = {
     {
       "inputs": [
         {
+          "internalType": "externalEuint256[]",
+          "name": "limbs",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint32",
+          "name": "emailByteLen",
+          "type": "uint32"
+        },
+        {
+          "internalType": "externalEuint128",
+          "name": "encSkShare",
+          "type": "bytes32"
+        },
+        {
           "internalType": "bytes",
-          "name": "recipientEmail",
+          "name": "payload",
           "type": "bytes"
         },
         {
           "internalType": "bytes",
-          "name": "data",
+          "name": "inputProof",
           "type": "bytes"
+        }
+      ],
+      "name": "addMessage",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "externalEuint256[]",
+          "name": "limbs",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint32",
+          "name": "emailByteLen",
+          "type": "uint32"
+        },
+        {
+          "internalType": "externalEuint128",
+          "name": "encSkShare",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes",
+          "name": "payload",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes",
+          "name": "inputProof",
+          "type": "bytes"
+        },
+        {
+          "internalType": "string",
+          "name": "publicMessage",
+          "type": "string"
         }
       ],
       "name": "addMessage",
@@ -174,14 +221,8 @@ export const FarewellABI = {
         }
       ],
       "name": "claim",
-      "outputs": [
-        {
-          "internalType": "euint128",
-          "name": "",
-          "type": "bytes32"
-        }
-      ],
-      "stateMutability": "view",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -224,6 +265,13 @@ export const FarewellABI = {
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "register",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint64",
@@ -234,16 +282,6 @@ export const FarewellABI = {
           "internalType": "uint64",
           "name": "gracePeriod",
           "type": "uint64"
-        },
-        {
-          "internalType": "externalEuint128",
-          "name": "skShare",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "bytes",
-          "name": "skShareProof",
-          "type": "bytes"
         }
       ],
       "name": "register",
@@ -254,19 +292,45 @@ export const FarewellABI = {
     {
       "inputs": [
         {
-          "internalType": "externalEuint128",
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "index",
+          "type": "uint256"
+        }
+      ],
+      "name": "retrieve",
+      "outputs": [
+        {
+          "internalType": "euint128",
           "name": "skShare",
           "type": "bytes32"
         },
         {
+          "internalType": "euint256[]",
+          "name": "encodedRecipientEmail",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint32",
+          "name": "emailByteLen",
+          "type": "uint32"
+        },
+        {
           "internalType": "bytes",
-          "name": "skShareProof",
+          "name": "payload",
           "type": "bytes"
+        },
+        {
+          "internalType": "string",
+          "name": "publicMessage",
+          "type": "string"
         }
       ],
-      "name": "registerDefault",
-      "outputs": [],
-      "stateMutability": "nonpayable",
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -320,11 +384,6 @@ export const FarewellABI = {
           "internalType": "struct Farewell.Notifier",
           "name": "notifier",
           "type": "tuple"
-        },
-        {
-          "internalType": "euint128",
-          "name": "_skShare",
-          "type": "bytes32"
         }
       ],
       "stateMutability": "view",

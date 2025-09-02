@@ -1,168 +1,265 @@
-# FHEVM React Template
+# Farewell       
+<p align="center"> <img src="assets/logo.png" alt="Farewell Logo" width="600"/> </p>
 
-The FHEVM React Template is an ultra-minimal React project for building and running an FHEVM-enabled dApp.
-It works alongside the [fhevm-hardhat-template](https://github.com/zama-ai/fhevm-hardhat-template)
-and provides a simple development frontend for interacting with the `FHECounter.sol` contract.
+**Farewell** is a proof-of-concept decentralized application (dApp) that allows people to leave **posthumous encrypted messages** to their loved ones.  
+It uses **smart contracts** on top of the [fhevm](https://github.com/zama-ai/fhevm) to securely store encrypted data, enforce liveness checks, and release messages only after a configurable timeout.
 
-This template also illustrates how to run your FHEVM-dApp on both Sepolia as well as a local Hardhat Node (much faster).
+Because it is deployed as a smart contract on a blockchain (such as Ethereum), **Farewell inherits the reliability and persistence of decentralized infrastructure**. This means the system is designed so that it will keep functioning for decades without depending on a single server or authority, and messages cannot be lost or tampered with once stored.
 
-> [!IMPORTANT]
-> Please follow the detailed installation instructions [below](#install).
+---
 
-## Features
+## ✨ Features
 
-- **@zama-fhe/relayer-sdk**: Fully Homomorphic Encryption for Ethereum Virtual Machine
-- **React**: Modern UI framework for building interactive interfaces
-- **Next.js**: Next-generation frontend build tool
-- **Tailwind**: Utility-first CSS framework for rapid UI development
+- **Check-in mechanism**:  
+    Each user sets a `checkInPeriod` (e.g. 6 months) and must periodically call `checkIn()` to prove they are still alive.
+    
+- **Grace period**:  
+    After `checkInPeriod` expires, a `gracePeriod` allows for unexpected delays before being marked deceased.
+    
+- **Deceased flagging**:  
+    If the user does not check in during both periods, anyone may call `markDeceased()` to change the user’s status.
+    
+- **Encrypted messages**:  
+    Users can upload encrypted messages with associated recipients. Messages contain:
+    
+    - Encrypted recipient’s email (string treated as an array of euint)
+        
+    - Encrypted message data (treated as locally-encrypted ciphertext)
+        
+    - A private share of the user’s decryption key (kept as an `euint` so it remains hidden until revealed)
+        
+- **Delivery mechanism**:  
+    After the user is flagged as deceased:
+    
+    - Anyone may call `claim()` to mark a message as ready for release.
+        
+    - Recipients (or external services) can then call `retrieve()` (view) to obtain a **DeliveryPackage** containing:
+        
+        - Recipient’s email
+            
+        - Ciphertext with the message
+            
+        - Key share
+            
+- **Blockchain persistence**:  
+    By running entirely as a smart contract on a blockchain such as Ethereum, **Farewell ensures that the system continues to operate reliably for decades**, independent of any central operator, and that **no messages can be lost once stored**.
+    
 
-## Requirements
+---
 
-- You need to have Metamask browser extension installed on your browser.
+## ⚠️ Notes & Limitations
 
-## Local Hardhat Network (to add in MetaMask)
+- All **data must be encrypted client-side** before being stored on-chain.  
+    We recommend using [GPG](https://gnupg.org/) for encryption.
+    
+- To **save gas costs**, messages should be **compacted** before submission (e.g., archive + compress with `tar` and `gzip`).
+    
+- On-chain data is **public**.
+    
+    - The submitted message is visible, that's why they are are meant to be pre-encrypted client-side.
+        
+    - Key shares are stored as **encrypted integers (`euint`)**, which remain hidden until released.
+        
+- This is a **Proof-of-Concept** only.  
+    Not production-ready, no guarantees of security, privacy, or delivery.
+    
 
-Follow the step-by-step guide in the [Hardhat + MetaMask](https://docs.metamask.io/wallet/how-to/run-devnet/) documentation to set up your local devnet using Hardhat and MetaMask.
+---
 
-- Name: Hardhat
-- RPC URL: http://127.0.0.1:8545
-- Chain ID: 31337
-- Currency symbol: ETH
+## 📂 Project Structure
 
-## Install
-
-### Automatic install
-
-1. Clone this repository.
-2. From the repo root, run:
-
-```sh
-# - git clone "https://github.com/zama-ai/fhevm-hardhat-template.git" into <root>/packages
-# - npm install
-# - auto-depoy on hardhat node
-node ./scripts/install.mjs
+```
+farewell/  
+├── assets/
+│   └── logo.png       
+├── contracts/  
+│   └── Farewell.sol       # Core smart contract  
+├── test/  
+│   └── Farewell.t.js      # Hardhat tests  
+├── hardhat.config.ts      # Hardhat setup  
+├── package.json  
+└── README.md              # This file
 ```
 
-### Manual install
+---
 
-1. Clone this repository.
-2. From the repo root, execute the following:
+## 🚀 Usage
 
-```sh
-cd ./packages
-git clone "https://github.com/zama-ai/fhevm-hardhat-template.git"
-cd ..
-npm install
+### Test and Deploy
+
+```bash
+npx hardhat compile
+npx hardhat test
+npx hardhat deploy --network <network>
 ```
 
-## Setup
+### Interact
 
-1. Setup your hardhat environment variables:
+In Hardhat console:
 
-Follow the detailed instructions in the [FHEVM documentation](https://docs.zama.ai/protocol/solidity-guides/getting-started/setup#set-up-the-hardhat-configuration-variables-optional) to setup `MNEMONIC` + `INFURA_API_KEY` Hardhat environment variables
-
-2. Start a local Hardhat node (new terminal):
-
-```sh
-cd packages/fhevm-hardhat-template
-npx hardhat node --verbose
-# Default RPC: http://127.0.0.1:8545  | chainId: 31337
+```bash
+npx hardhat console --network <network>
 ```
 
-3. Deploy `FHECounter` to the local node:
 
-```sh
-# still in packages/fhevm-hardhat-template
-npx hardhat deploy --network localhost
+---
+
+## 🔐 Workflow
+
+### 1. User registers
+
+- Defines `checkInPeriod` + `gracePeriod`
+    
+- Stores encrypted key share
+    
+
+### 2. User adds messages
+
+- Each message contains recipient email and ciphertext
+    
+
+### 3. User stays alive
+
+- Calls `checkIn()` periodically
+    
+
+### 4. Timeout occurs
+
+- Anyone may call `markDeceased()`
+    
+
+### 5. Messages are claimed and retrieved
+
+- `claim()` marks the message as ready
+    
+- `retrieve()` (view) returns a **DeliveryPackage**:  
+    `(recipientEmail, ciphertext, keyShare)`
+    
+- Off-chain system delivers and decrypts messages
+    
+
+---
+
+## 📊 Sequence Diagrams
+
+### Register & Add Message
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant SC as Farewell Contract
+    participant BC as Blockchain
+
+    U->>SC: register(checkInPeriod, gracePeriod, keyShare)
+    SC->>BC: Store UserConfig
+    U->>SC: addMessage(email, ciphertext)
+    SC->>BC: Store Message metadata
 ```
 
-4. Deploy to Sepolia:
+---
 
-Follows instructions in the [FHEVM documentation to setup your Hardhat project for Sepolia](https://docs.zama.ai/protocol/solidity-guides/getting-started/setup#set-up-the-hardhat-configuration-variables-optional)
+### Check-in Flow
 
-```sh
-# still in packages/fhevm-hardhat-template
-npx hardhat deploy --network sepolia
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant SC as Farewell Contract
+    participant BC as Blockchain
+
+    U->>SC: checkIn()
+    SC->>BC: Update lastCheckIn timestamp
 ```
 
-## Run frontend in mock mode
+---
 
-1. Start a local Hardhat node (new terminal):
+### Mark as Deceased & Delivery
 
-```sh
-cd packages/fhevm-hardhat-template
-npx hardhat node --verbose
+```mermaid
+sequenceDiagram
+    participant A as Anyone
+    participant SC as Farewell Contract
+    participant R as Recipient
+
+    A->>SC: markDeceased(user)
+    A->>SC: claim(messageId)
+    R->>SC: retrieve(messageId)
+    SC-->>R: DeliveryPackage (recipientEmail, ciphertext, keyShare)
+
+    R->>OffChain: Listen to events
+    OffChain->>R: Deliver decrypted message
 ```
 
-2. From the `<root>/packages/site` run
+---
 
-```sh
-npm run dev:mock
+## 🔧 Encrypting & Compacting Data
+
+All data stored on-chain should be **encrypted and compacted** to reduce storage costs and keep confidentiality.
+
+### Encrypt and Compact
+
+```bash
+# Encrypt with GPG
+gpg --symmetric --cipher-algo AES256 message.txt
+
+# Pack + compress the encrypted file
+tar -czf message.tar.gz message.txt.gpg
 ```
 
-3. In your browser open `http://localhost:3000`
+### Hex-encode for Contract Submission
 
-4. Open Metamask connect to local Hardhat node
-   i. Select Add network.
-   ii. Select Add a network manually.
-   iii. Enter your Hardhat Network RPC URL, http://127.0.0.1:8545/ (or http://localhost:8545).
-   iv. Enter your Hardhat Network chain ID, 31337 (or 0x539 in hexadecimal format).
+```bash
+# Encode to hex (Linux/Unix)
+xxd -p message.tar.gz | tr -d '\n' > message.hex
+```
 
-## How to fix Hardhat Node + Metamask Errors ?
+Now you can pass the contents of `message.hex` (prefixed with `0x`) to `addMessage()`.
 
-When using MetaMask as a wallet provider with a development node like Hardhat, you may encounter two common types of errors:
+Example:
 
-### 1. ⚠️ Nonce Mismatch ❌💥
+```js
+await Farewell.addMessage("alice@example.com", "0x" + hexString);
+```
 
-MetaMask tracks wallet nonces (the number of transactions sent from a wallet). However, if you restart your Hardhat node, the nonce is reset on the dev node, but MetaMask does not update its internal nonce tracking. This discrepancy causes a nonce mismatch error.
+### Recover Message
 
-### 2. ⚠️ View Function Call Result Mismatch ❌💥
+```bash
+# Decode from hex
+xxd -r -p message.hex > message.tar.gz
 
-MetaMask caches the results of view function calls. If you restart your Hardhat node, MetaMask may return outdated cached data corresponding to a previous instance of the node, leading to incorrect results.
+# Extract the archive
+tar -xzf message.tar.gz
 
-### ✅ How to Fix Nonce Mismatch:
+# Decrypt with GPG
+gpg --decrypt message.txt.gpg
+```
 
-To fix the nonce mismatch error, simply clear the MetaMask cache:
+---
 
-1. Open the MetaMask browser extension.
-2. Select the Hardhat network.
-3. Go to Settings > Advanced.
-4. Click the "Clear Activity Tab" red button to reset the nonce tracking.
+### 🔑 Obtaining the Secret Key Share
 
-The correct way to do this is also explained [here](https://docs.metamask.io/wallet/how-to/run-devnet/).
+_(todo: add detailed explanation of how to export and provide the encrypted share for the contract)_
 
-### ✅ How to Fix View Function Return Value Mismatch:
+---
 
-To fix the view function result mismatch:
+## 🔮 Future Extensions
 
-1. Restart the entire browser. MetaMask stores its cache in the extension's memory, which cannot be cleared by simply clearing the browser cache or using MetaMask's built-in cache cleaning options.
+Farewell can be extended with **zero-knowledge proofs (ZKPs)** to add stronger guarantees of delivery:
 
-By following these steps, you can ensure that MetaMask syncs correctly with your Hardhat node and avoid potential issues related to nonces and cached view function results.
+- **Proof of email delivery**:  
+    By integrating [zk.email](https://docs.zk.email/architecture/on-chain), a recipient (or service) could prove on-chain that the encrypted message was actually submitted to an email provider.  
+    This would allow `claim()` not only to release a DeliveryPackage, but also to **reward the claimer** once they provide a valid delivery proof.
+    
+- **Privacy-preserving claims**:  
+    ZKPs could allow recipients to prove ownership of an email (or account) without revealing it on-chain, enhancing privacy.
+    
+- **Incentive mechanisms**:  
+    Rewards could be tied to proofs, ensuring that only successful delivery attempts are compensated.
+    
 
-## Project Structure Overview
+This functionality is **not implemented yet**, but is a natural evolution of the Farewell project.
 
-### Key Files/Folders
+---
 
-- **`<root>/packages/site/fhevm`**: This folder contains the essential hooks needed to interact with FHEVM-enabled smart contracts. It is meant to be easily copied and integrated into any FHEVM + React project.
+## 📜 License
 
-- **`<root>/packages/site/hooks/useFHECounter.tsx`**: A simple React custom hook that demonstrates how to use the `useFhevm` hook in a basic use case, serving as an example of integration.
-
-### Secondary Files/Folders
-
-- **`<root>/packages/site/hooks/metamask`**: This folder includes hooks designed to manage the MetaMask Wallet provider. These hooks can be easily adapted or replaced to support other wallet providers, following the EIP-6963 standard,
-- Additionally, the project is designed to be flexible, allowing developers to easily replace `ethers.js` with a more React-friendly library of their choice, such as `Wagmi`.
-
-## Documentation
-
-- [Hardhat + MetaMask](https://docs.metamask.io/wallet/how-to/run-devnet/): Set up your local devnet step by step using Hardhat and MetaMask.
-- [FHEVM Documentation](https://docs.zama.ai/protocol/solidity-guides/)
-- [FHEVM Hardhat](https://docs.zama.ai/protocol/solidity-guides/development-guide/hardhat)
-- [@zama-fhe/relayer-sdk Documentation](https://docs.zama.ai/protocol/relayer-sdk-guides/)
-- [Setting up MNEMONIC and INFURA_API_KEY](https://docs.zama.ai/protocol/solidity-guides/getting-started/setup#set-up-the-hardhat-configuration-variables-optional)
-- [React Documentation](https://reactjs.org/)
-- [FHEVM Discord Community](https://discord.com/invite/zama)
-- [GitHub Issues](https://github.com/zama-ai/fhevm-react-template/issues)
-
-## License
-
-This project is licensed under the BSD-3-Clause-Clear License - see the LICENSE file for details.
+MIT

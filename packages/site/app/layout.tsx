@@ -15,13 +15,13 @@ export default async function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`zama-bg text-foreground antialiased`}>
-        <div className="fixed inset-0 w-full h-full zama-bg z-[-20] min-w-[850px]"></div>
+      <body className={`farewell-bg text-foreground antialiased`}>
+        <div className="fixed inset-0 w-full h-full farewell-bg z-[-20] min-w-[850px]"></div>
         <main className="flex flex-col max-w-screen-lg mx-auto pb-20 min-w-[850px]">
           <nav className="flex w-full px-3 md:px-0 h-fit py-10 justify-between items-center">
             <Image
-              src="/zama-logo.svg"
-              alt="Zama Logo"
+              src="/farewell-logo.png"
+              alt="Farewell Logo"
               width={120}
               height={120}
             />
