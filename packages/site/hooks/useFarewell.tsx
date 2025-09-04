@@ -3,7 +3,6 @@
 import { ethers } from "ethers";
 import {
   RefObject,
-  use,
   useCallback,
   useEffect,
   useMemo,
@@ -12,7 +11,6 @@ import {
 } from "react";
 
 import type { FhevmInstance } from "@/fhevm/fhevmTypes";
-import { FhevmDecryptionSignature } from "@/fhevm/FhevmDecryptionSignature";
 import { GenericStringStorage } from "@/fhevm/GenericStringStorage";
 
 /*
@@ -63,8 +61,9 @@ function packEmailTo256Limbs(emailUtf8: string) {
   const limbs: bigint[] = [];
   for (let i = 0; i < bytes.length; i += 32) {
     const chunk = bytes.subarray(i, i + 32);
-    let v = 0n;
-    for (let j = 0; j < chunk.length; j++) v = (v << 8n) + BigInt(chunk[j]);
+    let v = BigInt(0);
+    for (let j = 0; j < chunk.length; j++)
+      v = (v << BigInt(8)) + BigInt(chunk[j]);
     limbs.push(v);
   }
   return { limbs, byteLen: len };
@@ -72,7 +71,6 @@ function packEmailTo256Limbs(emailUtf8: string) {
 
 export const useFarewell = (parameters: {
   instance: FhevmInstance | undefined;
-  fhevmDecryptionSignatureStorage: GenericStringStorage;
   chainId: number | undefined;
   ethersSigner: ethers.JsonRpcSigner | undefined;
   ethersReadonlyProvider: ethers.ContractRunner | undefined;
@@ -83,7 +81,6 @@ export const useFarewell = (parameters: {
 }) => {
   const {
     instance,
-    fhevmDecryptionSignatureStorage,
     chainId,
     ethersSigner,
     ethersReadonlyProvider,
@@ -100,8 +97,8 @@ export const useFarewell = (parameters: {
     isBusyRef.current = isBusy;
   }, [isBusy]);
 
-  const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
-  const isDecryptingRef = useRef<boolean>(isDecrypting);
+  // const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
+  // const isDecryptingRef = useRef<boolean>(isDecrypting);
 
   const farewellRef = useRef<FarewellInfoType | undefined>(undefined);
   const farewell = useMemo(() => {
@@ -148,8 +145,6 @@ export const useFarewell = (parameters: {
         const result = (await contract.messageCount(target)) as bigint;
         setMessage(``);
         return result;
-      } catch (e: any) {
-        throw e;
       } finally {
         setIsBusy(false);
       }
@@ -215,8 +210,6 @@ export const useFarewell = (parameters: {
             publicMessage: res[4] as string,
           } as DeliveryPackage;
         }
-      } catch (e: any) {
-        throw e;
       } finally {
         setIsBusy(false);
       }
@@ -250,10 +243,14 @@ export const useFarewell = (parameters: {
       await tx.wait();
       if (isStale()) return;
       setMessage("register() completed.");
-    } catch (e: any) {
-      const raw =
-        e?.info?.error?.message || e?.error?.message || e?.message || String(e);
-      setMessage(`register() failed: ${raw}`);
+    } catch (e: unknown) {
+      const raw = 
+            e instanceof Error 
+            ? e?.message 
+            : typeof e === 'string'
+            ? e
+            : JSON.stringify(e);
+          setMessage(`register() failed: ${raw}`);
     } finally {
       setIsBusy(false);
     }
@@ -290,13 +287,14 @@ export const useFarewell = (parameters: {
         await tx.wait();
         if (isStale()) return;
         setMessage("register(checkIn,grace) completed.");
-      } catch (e: any) {
-        const raw =
-          e?.info?.error?.message ||
-          e?.error?.message ||
-          e?.message ||
-          String(e);
-        setMessage(`register(checkIn,grace) failed: ${raw}`);
+      } catch (e: unknown) {
+        const raw = 
+                  e instanceof Error 
+                  ? e?.message 
+                  : typeof e === 'string'
+                  ? e
+                  : JSON.stringify(e);
+                setMessage(`register(checkIn,grace) failed: ${raw}`);
       } finally {
         setIsBusy(false);
       }
@@ -334,9 +332,9 @@ export const useFarewell = (parameters: {
       await tx.wait();
       if (isStale()) return;
       setMessage("ping() completed.");
-    } catch (e: any) {
+    } catch (e: unknown) {
       const raw =
-        e?.info?.error?.message || e?.error?.message || e?.message || String(e);
+            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
       setMessage(`ping() failed: ${raw}`);
     } finally {
       setIsBusy(false);
@@ -391,7 +389,7 @@ export const useFarewell = (parameters: {
         await new Promise((r) => setTimeout(r, 80));
 
         const userAddr =
-          (thisSigner as any)?.address ??
+          thisSigner.address ??
           (await thisSigner.getAddress().catch(() => undefined));
         if (!userAddr) throw new Error("Cannot resolve signer address");
 
@@ -421,10 +419,10 @@ export const useFarewell = (parameters: {
         const c = new ethers.Contract(thisAddr, farewell.abi, thisSigner);
 
         // Disambiguate overloads (ethers v6)
-        const addMsg5 = c.getFunction(
+        const addMsg = c.getFunction(
           "addMessage(bytes32[],uint32,bytes32,bytes,bytes)"
         );
-        const addMsg6 = c.getFunction(
+        const addMsgWithPublicPart = c.getFunction(
           "addMessage(bytes32[],uint32,bytes32,bytes,bytes,string)"
         );
 
@@ -432,7 +430,7 @@ export const useFarewell = (parameters: {
 
         const tx: ethers.TransactionResponse =
           publicMessage !== undefined
-            ? await addMsg6(
+            ? await addMsgWithPublicPart(
                 limbHandles,
                 byteLen,
                 encSkShareHandle,
@@ -440,7 +438,7 @@ export const useFarewell = (parameters: {
                 inputProof,
                 publicMessage
               )
-            : await addMsg5(
+            : await addMsg(
                 limbHandles,
                 byteLen,
                 encSkShareHandle,
@@ -470,14 +468,11 @@ export const useFarewell = (parameters: {
           throw new Error("Transaction failed");
         }
 
-        setMessage(`addMessage confirmed in block ${receipt.blockNumber}.`);
+        setMessage(`addMessage confirmed in block ${receipt.blockNumber}. View on Etherscan: https://sepolia.etherscan.io/tx/${txHash})`);
         return { txHash, receipt };
-      } catch (e: any) {
+      } catch (e: unknown) {
         const raw =
-          e?.info?.error?.message ||
-          e?.error?.message ||
-          e?.message ||
-          String(e);
+            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
         setMessage(`addMessage failed: ${raw}`);
         throw e;
       } finally {
@@ -516,12 +511,9 @@ export const useFarewell = (parameters: {
         setMessage(`Trying to mark ${target} as deceased...`);
         await tx.wait();
         if (isStale()) return;
-      } catch (e: any) {
+      } catch (e: unknown) {
         const raw =
-          e?.info?.error?.message ||
-          e?.error?.message ||
-          e?.message ||
-          String(e);
+            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
         setMessage(`markDeceased() failed: ${raw}`);
       } finally {
         setIsBusy(false);
@@ -554,12 +546,9 @@ export const useFarewell = (parameters: {
         await tx.wait();
         if (isStale()) return;
         setMessage("claim() completed.");
-      } catch (e: any) {
-        const raw =
-          e?.info?.error?.message ||
-          e?.error?.message ||
-          e?.message ||
-          String(e);
+      } catch (e: unknown) {
+       const raw =
+            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
         setMessage(`claim() failed: ${raw}`);
       } finally {
         setIsBusy(false);

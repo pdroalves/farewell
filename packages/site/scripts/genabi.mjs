@@ -2,6 +2,18 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 
+const isCI = !!(process.env.GITHUB_ACTIONS || process.env.CI || process.env.FAREWELL_SKIP_GENABI);
+const contractsDir = path.resolve(process.cwd(), "../farewell"); // expecting <root>/packages/farewell
+
+if (isCI) {
+  console.log("\n(genabi) Skipping in CI.\n");
+  process.exit(0);
+}
+if (!fs.existsSync(contractsDir)) {
+  console.log(`\n(genabi) Skipping: contracts folder not found at ${contractsDir}\n`);
+  process.exit(0);
+}
+
 const CONTRACT_NAME = "Farewell";
 
 // <root>/packages/farewell

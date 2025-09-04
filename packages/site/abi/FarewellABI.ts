@@ -233,6 +233,25 @@ export const FarewellABI = {
           "type": "address"
         }
       ],
+      "name": "isRegistered",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
       "name": "markDeceased",
       "outputs": [],
       "stateMutability": "nonpayable",

@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   description: "Farewell POC with FHEVM",
 };
 
+// app/prefix.ts
+export const prefix =
+  process.env.NODE_ENV === "production" ? "/farewell-react" : "";
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -20,7 +24,7 @@ export default async function RootLayout({
         <main className="flex flex-col max-w-screen-lg mx-auto pb-20 min-w-[850px]">
           <nav className="flex w-full px-3 md:px-0 h-fit py-10 justify-between items-center">
             <Image
-              src="/farewell-logo.png"
+              src={`${prefix}/farewell-logo.png`}
               alt="Farewell Logo"
               width={120}
               height={120}

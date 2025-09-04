@@ -8,36 +8,6 @@ import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSign
 import { useFarewell } from "@/hooks/useFarewell";
 import { FhevmDecryptionSignature } from "@/fhevm/FhevmDecryptionSignature";
 import { ethers } from "ethers";
-import { FhevmType } from "@fhevm/hardhat-plugin";
-import { FarewellAddresses } from "@/abi/FarewellAddresses";
-
-// Type-safe helpers
-function toHex32(value: bigint): `0x${string}` {
-  return ethers.toBeHex(value, 32); // 32-byte padded hex
-}
-
-function parseSkShare(value: unknown): { dec: string; hex: `0x${string}` } {
-  if (typeof value === "bigint") {
-    return { dec: value.toString(10), hex: toHex32(value) };
-  }
-  if (typeof value === "string" && value.startsWith("0x")) {
-    // hex -> bigint
-    const bi = BigInt(value);
-    return {
-      dec: bi.toString(10),
-      hex: ethers.hexlify(
-        ethers.zeroPadValue(value as `0x${string}`, 32)
-      ) as `0x${string}`,
-    };
-  }
-  if (typeof value === "number") {
-    const bi = BigInt(value);
-    return { dec: bi.toString(10), hex: toHex32(bi) };
-  }
-  // fallback
-  const s = String(value ?? "");
-  return { dec: s, hex: s as any };
-}
 
 export default function Farewell() {
   const { storage: fhevmDecryptionSignatureStorage } = useInMemoryStorage();
@@ -70,7 +40,6 @@ export default function Farewell() {
   // Farewell hook
   const farewell = useFarewell({
     instance: fhevmInstance,
-    fhevmDecryptionSignatureStorage,
     chainId,
     ethersSigner,
     ethersReadonlyProvider,
@@ -97,7 +66,7 @@ export default function Farewell() {
   // Retrieve outputs (read-only boxes)
   const [retrievedSkShare, setRetrievedSkShare] = useState<
     string | bigint | boolean
-  >();
+  >("");
   const [retrievedEmailLen, setRetrievedEmailLen] = useState<string>("");
   const [retrievedLimbCount, setRetrievedLimbCount] = useState<string>("");
   const [retrievedPayloadHex, setRetrievedPayloadHex] = useState("");
@@ -240,17 +209,17 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
             </div>
           </div>
 
-          {farewell.message && (
-            <div className={cardClass}>
-              <p className="text-sm text-slate-700">{farewell.message}</p>
-            </div>
-          )}
         </>
       )}
 
       {friendlyName && (
         <div className="text-xl font-semibold text-slate-800">
           Hello, {friendlyName}!
+        </div>
+      )}
+      {farewell.message && (
+        <div className={cardClass}>
+          <p className="text-sm text-slate-700">{farewell.message}</p>
         </div>
       )}
       {/* Register / Ping */}
@@ -289,7 +258,7 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
               disabled={farewell.isBusy || !isConnected}
               onClick={() => {
                 const dToSec = (d: string) =>
-                  BigInt(Math.max(0, Number(d || 0))) * 24n * 60n * 60n;
+                  BigInt(Math.max(0, Number(d || 0))) * BigInt(24 * 60 * 60);
                 const checkInSec = dToSec(checkInDays);
                 const graceSec = dToSec(graceDays);
                 farewell
@@ -375,20 +344,17 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
               onClick={() =>
                 (async () => {
                   const share = BigInt(skShare);
-                  const payloadValue = isHex(payload as any)
+                  const payloadValue = isHex(payload)
                     ? (payload as `0x${string}`)
                     : payload;
 
-                  const { txHash, receipt } = await farewell.addMessage(
+                  await farewell.addMessage(
                     email,
                     share,
                     payloadValue,
                     publicMessage.trim() ? publicMessage : undefined
                   );
 
-                  alert(
-                    `Message added ✅\nTx: ${txHash}\nBlock: ${receipt.blockNumber}`
-                  );
                 })().catch((e) =>
                   alert(`Add Message failed:\n${String(e?.message ?? e)}`)
                 )
@@ -534,13 +500,12 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
                 setRetrievedPubMsg(res.publicMessage ?? "");
                 setRetrievedEmailLen(String(res.emailByteLen));
                 setRetrievedLimbCount(
-                  Array.isArray((res as any).encodedRecipientEmail)
+                  Array.isArray(res.encodedRecipientEmail)
                     ? String(
-                        ((res as any).encodedRecipientEmail as unknown[]).length
+                        (res.encodedRecipientEmail as unknown[]).length
                       )
                     : "0"
                 );
-                const sk = parseSkShare((res as any).skShare);
                 // Decrypt skShare and recipient email if FHEVM is ready & signer present
                 if (
                   !fhevmReady ||
@@ -569,8 +534,8 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
                     return;
                   }
 
-                  const limbsHandles = (res as any)
-                    .encodedRecipientEmail as `0x${string}`[];
+                  const limbsHandles =
+                    res.encodedRecipientEmail as `0x${string}`[];
                   if (
                     !Array.isArray(limbsHandles) ||
                     limbsHandles.length === 0
@@ -617,7 +582,7 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
                   const decSkShare = await fhevmInstance.userDecrypt(
                     [
                       {
-                        handle: (res as any).skShare as `0x${string}`,
+                        handle: res.skShare as `0x${string}`,
                         contractAddress: farewell.contractAddress,
                       },
                     ],
@@ -630,13 +595,17 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
                     sig.durationDays
                   );
                   console.log("decSkShare", decSkShare);
-                  setRetrievedSkShare(
-                    decSkShare[(res as any).skShare as `0x${string}`]
-                  );
-                } catch (e: any) {
-                  setRetrievedRecipientEmail(
-                    `(decrypt failed: ${String(e?.message ?? e)})`
-                  );
+                  setRetrievedSkShare(decSkShare[res.skShare as `0x${string}`]);
+                } catch (e: unknown) {
+                  if (e instanceof Error) {
+                    setRetrievedRecipientEmail(
+                      `(decrypt failed: ${String(e.message ?? e)})`
+                    );
+                  } else {
+                    setRetrievedRecipientEmail(
+                      `(decrypt failed: ${String(e)})`
+                    );
+                  }
                 }
               })().catch((e) => alert(String(e?.message ?? e)))
             }
@@ -685,7 +654,7 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
             <div className="grid grid-cols-2 gap-3">
               <input
                 className={inputReadonlyClass}
-                value={retrievedSkShare}
+                value={retrievedSkShare.toString()}
                 readOnly
                 placeholder="shared secret"
                 aria-label="email byte length"
