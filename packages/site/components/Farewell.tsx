@@ -82,6 +82,7 @@ export default function Farewell() {
 
   const [lastCount, setLastCount] = useState<string>("");
 
+
   // === Style tokens (Tailwind) ==============================================
   const cardClass =
     "rounded-2xl border border-slate-200 bg-slate-50/80 backdrop-blur-sm shadow-sm p-5";
@@ -133,32 +134,34 @@ export default function Farewell() {
 
   // Pick friendly name for current account
   // Friendly greeting name
-// --- Friendly name mapping (robust) ---
-const normalizeEvm = (addr?: string) => {
-  try {
-    return ethers.getAddress((addr ?? "").trim());
-  } catch {
-    return "";
+  // --- Friendly name mapping (robust) ---
+  const normalizeEvm = (addr?: string) => {
+    try {
+      return ethers.getAddress((addr ?? "").trim());
+    } catch {
+      return "";
+    }
+  };
+
+  const connectedRaw = (accounts?.[0] ?? "").trim();
+  const connectedEvm = normalizeEvm(connectedRaw);
+
+  // Known IDs (normalize EVM ones)
+  const ALICE_EVM = normalizeEvm("0x89b91f8f6A90E7460fe5E62Bcd6f50e74f2e46D4");
+  const BOB_EVM = normalizeEvm("0xF21D8d19E0De068076851A7BC26d0d57fE670Ae4");
+  const CHARLIE_EVM = normalizeEvm(
+    "0xc674BB946782992C7C869dCb514a3AfeBD575564"
+  );
+
+  let friendlyName: string | null = null;
+
+  if (connectedEvm && connectedEvm === ALICE_EVM) {
+    friendlyName = "Alice";
+  } else if (connectedEvm && connectedEvm === BOB_EVM) {
+    friendlyName = "Bob";
+  } else if (connectedEvm && connectedEvm === CHARLIE_EVM) {
+    friendlyName = "Charlie";
   }
-};
-
-const connectedRaw = (accounts?.[0] ?? "").trim();
-const connectedEvm = normalizeEvm(connectedRaw);
-
-// Known IDs (normalize EVM ones)
-const ALICE_EVM = normalizeEvm("0x89b91f8f6A90E7460fe5E62Bcd6f50e74f2e46D4");
-const BOB_EVM   = normalizeEvm("0xF21D8d19E0De068076851A7BC26d0d57fE670Ae4");
-const CHARLIE_EVM = normalizeEvm("0xc674BB946782992C7C869dCb514a3AfeBD575564");
-
-let friendlyName: string | null = null;
-
-if (connectedEvm && (connectedEvm === ALICE_EVM)) {
-  friendlyName = "Alice";
-} else if (connectedEvm && (connectedEvm === BOB_EVM)) {
-  friendlyName = "Bob";
-} else if (connectedEvm && (connectedEvm === CHARLIE_EVM)) {
-  friendlyName = "Charlie";
-}
 
   return (
     <div className="mx-auto max-w-7xl p-6 space-y-6">
@@ -208,15 +211,24 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
               {printProperty("isBusy", farewell.isBusy)}
             </div>
           </div>
-
         </>
       )}
 
       {friendlyName && (
         <div className="text-xl font-semibold text-slate-800">
-          Hello, {friendlyName}!
+          Hello, {friendlyName}!{" "}
+          {farewell && accounts?.[0] && (
+            <span className="font-normal text-slate-600">
+              {farewell.isRegistered === undefined
+                ? "(checking…)"
+                : farewell.isRegistered
+                  ? "You are registered :-)"
+                  : "You are not registered :-("}
+            </span>
+          )}
         </div>
       )}
+
       {farewell.message && (
         <div className={cardClass}>
           <p className="text-sm text-slate-700">{farewell.message}</p>
@@ -354,7 +366,6 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
                     payloadValue,
                     publicMessage.trim() ? publicMessage : undefined
                   );
-
                 })().catch((e) =>
                   alert(`Add Message failed:\n${String(e?.message ?? e)}`)
                 )
@@ -501,9 +512,7 @@ if (connectedEvm && (connectedEvm === ALICE_EVM)) {
                 setRetrievedEmailLen(String(res.emailByteLen));
                 setRetrievedLimbCount(
                   Array.isArray(res.encodedRecipientEmail)
-                    ? String(
-                        (res.encodedRecipientEmail as unknown[]).length
-                      )
+                    ? String((res.encodedRecipientEmail as unknown[]).length)
                     : "0"
                 );
                 // Decrypt skShare and recipient email if FHEVM is ready & signer present

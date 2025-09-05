@@ -97,8 +97,9 @@ export const useFarewell = (parameters: {
     isBusyRef.current = isBusy;
   }, [isBusy]);
 
-  // const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
-  // const isDecryptingRef = useRef<boolean>(isDecrypting);
+  const [isRegistered, setIsRegistered] = useState<boolean | undefined>(
+    undefined
+  );
 
   const farewellRef = useRef<FarewellInfoType | undefined>(undefined);
   const farewell = useMemo(() => {
@@ -116,6 +117,80 @@ export const useFarewell = (parameters: {
   }, [farewell]);
 
   /* ───────────────────────────────── READS ───────────────────────────────── */
+
+  const checkRegistration = useCallback(async () => {
+    if (!farewell.address || !ethersReadonlyProvider) {
+      throw new Error("Readonly provider or contract address not ready");
+    }
+    setIsBusy(true);
+    try {
+      if (!ethersSigner) {
+        throw new Error("Connect your wallet");
+      }
+      const addr = (await ethersSigner.getAddress()) as `0x${string}`;
+
+      const contract = new ethers.Contract(
+        farewell.address,
+        farewell.abi,
+        ethersReadonlyProvider
+      );
+
+      if (!contract || !addr) {
+        // If we can’t check, show no status (or false—your call)
+        setIsRegistered(undefined);
+        return undefined;
+      }
+      // Show "checking…" while the call is in flight
+      setIsRegistered(undefined);
+      const res: boolean = await contract.isRegistered(addr);
+      setIsRegistered(res);
+      return res;
+    } catch (err) {
+      console.error("isRegistered check failed:", err);
+      // Decide what you want in error: false or undefined.
+      // Using false prevents the UI from being stuck.
+      setIsRegistered(false);
+      return false;
+    } finally {
+      setIsBusy(false);
+    }
+  }, [farewell.address, farewell.abi, ethersReadonlyProvider]);
+
+  // Auto-check whenever we have a contract + user
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!farewell.address || !ethersReadonlyProvider) {
+        console.log("Readonly provider or contract address not ready");
+      }
+      try {
+        if (!ethersSigner) {
+          throw new Error("Connect your wallet");
+        }
+        const addr = (await ethersSigner.getAddress()) as `0x${string}`;
+
+        const checkContract = farewell.address ? farewell.address : "";
+        const contract = new ethers.Contract(
+          checkContract,
+          farewell.abi,
+          ethersReadonlyProvider
+        );
+
+        if (!contract || !addr) {
+          setIsRegistered(undefined);
+          return;
+        }
+        setIsRegistered(undefined); // triggers "(checking…)"
+        const res: boolean = await contract.isRegistered(addr);
+        if (!cancelled) setIsRegistered(res);
+      } catch {
+        if (!cancelled) setIsRegistered(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [farewell.address, farewell.abi, ethersReadonlyProvider]);
 
   const messageCount = useCallback(
     async (owner?: `0x${string}`) => {
@@ -241,27 +316,21 @@ export const useFarewell = (parameters: {
       const tx = await c.register(); // same as demo (no manual nonce)
       setMessage(`Wait for tx: ${tx.hash}...`);
       await tx.wait();
+      await checkRegistration();
       if (isStale()) return;
       setMessage("register() completed.");
     } catch (e: unknown) {
-      const raw = 
-            e instanceof Error 
-            ? e?.message 
-            : typeof e === 'string'
+      const raw =
+        e instanceof Error
+          ? e?.message
+          : typeof e === "string"
             ? e
             : JSON.stringify(e);
-          setMessage(`register() failed: ${raw}`);
+      setMessage(`register() failed: ${raw}`);
     } finally {
       setIsBusy(false);
     }
-  }, [
-    chainId,
-    farewell.address,
-    farewell.abi,
-    ethersSigner,
-    sameChain,
-    sameSigner,
-  ]);
+  }, [farewell.address, farewell.abi, ethersSigner, chainId, sameChain, sameSigner, checkRegistration]);
 
   const registerWithParams = useCallback(
     async (checkInSeconds: bigint, graceSeconds: bigint) => {
@@ -285,16 +354,17 @@ export const useFarewell = (parameters: {
         const tx = await c.register(checkInSeconds, graceSeconds);
         setMessage(`Wait for tx: ${tx.hash}...`);
         await tx.wait();
+        await checkRegistration();
         if (isStale()) return;
         setMessage("register(checkIn,grace) completed.");
       } catch (e: unknown) {
-        const raw = 
-                  e instanceof Error 
-                  ? e?.message 
-                  : typeof e === 'string'
-                  ? e
-                  : JSON.stringify(e);
-                setMessage(`register(checkIn,grace) failed: ${raw}`);
+        const raw =
+          e instanceof Error
+            ? e?.message
+            : typeof e === "string"
+              ? e
+              : JSON.stringify(e);
+        setMessage(`register(checkIn,grace) failed: ${raw}`);
       } finally {
         setIsBusy(false);
       }
@@ -334,7 +404,11 @@ export const useFarewell = (parameters: {
       setMessage("ping() completed.");
     } catch (e: unknown) {
       const raw =
-            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
+        e instanceof Error
+          ? e.message
+          : typeof e === "string"
+            ? e
+            : JSON.stringify(e);
       setMessage(`ping() failed: ${raw}`);
     } finally {
       setIsBusy(false);
@@ -468,11 +542,17 @@ export const useFarewell = (parameters: {
           throw new Error("Transaction failed");
         }
 
-        setMessage(`addMessage confirmed in block ${receipt.blockNumber}. View on Etherscan: https://sepolia.etherscan.io/tx/${txHash})`);
+        setMessage(
+          `addMessage confirmed in block ${receipt.blockNumber}. View on Etherscan: https://sepolia.etherscan.io/tx/${txHash})`
+        );
         return { txHash, receipt };
       } catch (e: unknown) {
         const raw =
-            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
+          e instanceof Error
+            ? e.message
+            : typeof e === "string"
+              ? e
+              : JSON.stringify(e);
         setMessage(`addMessage failed: ${raw}`);
         throw e;
       } finally {
@@ -513,7 +593,11 @@ export const useFarewell = (parameters: {
         if (isStale()) return;
       } catch (e: unknown) {
         const raw =
-            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
+          e instanceof Error
+            ? e.message
+            : typeof e === "string"
+              ? e
+              : JSON.stringify(e);
         setMessage(`markDeceased() failed: ${raw}`);
       } finally {
         setIsBusy(false);
@@ -547,8 +631,12 @@ export const useFarewell = (parameters: {
         if (isStale()) return;
         setMessage("claim() completed.");
       } catch (e: unknown) {
-       const raw =
-            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
+        const raw =
+          e instanceof Error
+            ? e.message
+            : typeof e === "string"
+              ? e
+              : JSON.stringify(e);
         setMessage(`claim() failed: ${raw}`);
       } finally {
         setIsBusy(false);
@@ -581,5 +669,7 @@ export const useFarewell = (parameters: {
     // reads
     messageCount,
     retrieve,
+    isRegistered,
+    checkRegistration,
   };
 };
