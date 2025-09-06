@@ -233,6 +233,95 @@ export const FarewellABI = {
           "type": "address"
         }
       ],
+      "name": "forceDeceased",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getDeceasedStatus",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getLastCheckIn",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getRegisteredOn",
+      "outputs": [
+        {
+          "internalType": "uint64",
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "getUserName",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
       "name": "isRegistered",
       "outputs": [
         {
@@ -293,6 +382,11 @@ export const FarewellABI = {
     {
       "inputs": [
         {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
           "internalType": "uint64",
           "name": "checkInPeriod",
           "type": "uint64"
@@ -301,6 +395,37 @@ export const FarewellABI = {
           "internalType": "uint64",
           "name": "gracePeriod",
           "type": "uint64"
+        }
+      ],
+      "name": "register",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint64",
+          "name": "checkInPeriod",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "gracePeriod",
+          "type": "uint64"
+        }
+      ],
+      "name": "register",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
         }
       ],
       "name": "register",
@@ -362,6 +487,11 @@ export const FarewellABI = {
       ],
       "name": "users",
       "outputs": [
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
         {
           "internalType": "uint64",
           "name": "checkInPeriod",

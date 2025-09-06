@@ -313,7 +313,8 @@ export const useFarewell = (parameters: {
     try {
       const c = new ethers.Contract(thisAddr, farewell.abi, thisSigner);
 
-      const tx = await c.register(); // same as demo (no manual nonce)
+        const reg = c.getFunction("register()");
+        const tx = await reg();
       setMessage(`Wait for tx: ${tx.hash}...`);
       await tx.wait();
       await checkRegistration();
@@ -330,7 +331,15 @@ export const useFarewell = (parameters: {
     } finally {
       setIsBusy(false);
     }
-  }, [farewell.address, farewell.abi, ethersSigner, chainId, sameChain, sameSigner, checkRegistration]);
+  }, [
+    farewell.address,
+    farewell.abi,
+    ethersSigner,
+    chainId,
+    sameChain,
+    sameSigner,
+    checkRegistration,
+  ]);
 
   const registerWithParams = useCallback(
     async (checkInSeconds: bigint, graceSeconds: bigint) => {
@@ -351,7 +360,8 @@ export const useFarewell = (parameters: {
 
       try {
         const c = new ethers.Contract(thisAddr, farewell.abi, thisSigner);
-        const tx = await c.register(checkInSeconds, graceSeconds);
+        const reg = c.getFunction("register(uint64,uint64)");
+        const tx = await reg(checkInSeconds, graceSeconds);
         setMessage(`Wait for tx: ${tx.hash}...`);
         await tx.wait();
         await checkRegistration();
