@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 
 // Get the absolute path to the script directory
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const GITHUB_REPO = "git@github.com:pdroalves/farewell.git";
+const GITHUB_REPO = "git@github.com:pdroalves/farewell-core.git";
 
 // Path to the packages directory
 const packagesDir = path.join(SCRIPT_DIR, "../packages");
@@ -87,7 +87,7 @@ export async function installFarewell() {
 }
 
 export async function install() {
-  // git clone "git@github.com:pdroalves/farewell.git" into <root>/packages
+  // git clone "git@github.com:pdroalves/farewell-core.git" into <root>/packages
   await installFarewell();
   // npm install
   await npmInstall();
