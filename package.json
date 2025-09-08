@@ -11,5 +11,8 @@
   ],
   "scripts": {
     "postinstall": "cd ./packages/site/ && npm run genabi"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0"
   }
 }
