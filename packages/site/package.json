@@ -3,10 +3,10 @@
   "version": "0.3.0",
   "private": true,
   "license": "BSD-3-Clause-Clear",
-  "homepage": "https://www.iampedro.com/farewell-react",
+  "homepage": "https://www.iampedro.com/farewell",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pdroalves/farewell-react.git"
+    "url": "git+https://github.com/pdroalves/farewell.git"
   },
   "scripts": {
     "clean": "rimraf .next",

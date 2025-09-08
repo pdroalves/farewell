@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 const isCI = !!(process.env.GITHUB_ACTIONS || process.env.CI || process.env.FAREWELL_SKIP_GENABI);
-const contractsDir = path.resolve(process.cwd(), "../farewell"); // expecting <root>/packages/farewell
+const contractsDir = path.resolve(process.cwd(), "../farewell-core"); // expecting <root>/packages/farewell-core
 
 if (isCI) {
   console.log("\n(genabi) Skipping in CI.\n");
@@ -17,7 +17,7 @@ if (!fs.existsSync(contractsDir)) {
 const CONTRACT_NAME = "Farewell";
 
 // <root>/packages/farewell
-const rel = "../farewell";
+const rel = "../farewell-core";
 
 // <root>/packages/site/components
 const outdir = path.resolve("./abi");

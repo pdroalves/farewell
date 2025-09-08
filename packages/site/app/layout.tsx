@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 // app/prefix.ts
 export const prefix =
-  process.env.NODE_ENV === "production" ? "/farewell-react" : "";
+  process.env.NODE_ENV === "production" ? "/farewell" : "";
 
 export default async function RootLayout({
   children,
