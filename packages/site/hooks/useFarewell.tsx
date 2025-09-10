@@ -21,12 +21,15 @@ import { FarewellAddresses } from "@/abi/FarewellAddresses";
 
 import { hex16ToBigint } from "@/lib/bit128";
 
+import { FhevmDecryptionSignature } from "@/fhevm/FhevmDecryptionSignature";
+
 import {
   bigintToKey16,
   aesImportRaw16,
   encryptUtf8AesGcmPacked,
   decryptUtf8AesGcmPacked,
 } from "@/lib/aes";
+import { useInMemoryStorage } from "./useInMemoryStorage";
 
 export type DeliveryPackage = {
   skShare: unknown; // euint128 (opaque)
@@ -37,6 +40,7 @@ export type DeliveryPackage = {
 };
 
 type FarewellInfoType = {
+  contractAddress: `0x${string}`;
   abi: typeof FarewellABI.abi;
   address?: `0x${string}`;
   chainId?: number;
@@ -94,11 +98,24 @@ export const useFarewell = (parameters: {
     sameChain,
     sameSigner,
   } = parameters;
+  const { storage: fhevmDecryptionSignatureStorage } = useInMemoryStorage();
 
   // UI-ish states
   const [message, setMessage] = useState<string>("");
   const [isBusy, setIsBusy] = useState<boolean>(false);
   const isBusyRef = useRef(isBusy);
+  // Recipient email (decrypted)
+  const [retrievedRecipientEmail, setRetrievedRecipientEmail] = useState("");
+  const [retrievedSkShare, setRetrievedSkShare] = useState<
+    string | bigint | boolean
+  >("");
+
+  // Retrieve outputs (read-only boxes)
+  const [retrievedEmailLen, setRetrievedEmailLen] = useState<string>("");
+  const [retrievedLimbCount, setRetrievedLimbCount] = useState<string>("");
+  const [retrievedPayloadHex, setRetrievedPayloadHex] = useState("");
+  const [retrievedPayloadUtf8, setRetrievedPayloadUtf8] = useState("");
+  const [retrievedPubMsg, setRetrievedPubMsg] = useState("");
 
   useEffect(() => {
     isBusyRef.current = isBusy;
@@ -235,7 +252,12 @@ export const useFarewell = (parameters: {
   );
 
   const retrieve = useCallback(
-    async (owner: `0x${string}`, index: bigint, sPrimeHex: `0x${string}`) => {
+    async (
+      owner: `0x${string}`,
+      index: bigint,
+      sPrimeHex: `0x${string}`,
+      fhevmInstance: FhevmInstance | undefined
+    ) => {
       if (!farewell.address) throw new Error("Contract address not ready");
 
       setIsBusy(true);
@@ -259,29 +281,138 @@ export const useFarewell = (parameters: {
             ethersSigner
           );
           const res = await contract.retrieve(target, index);
-          setIsBusy(false);
+          let skShare;
+          try {
+            setRetrievedPubMsg(res.publicMessage as string);
+            // Add pointer validation before code
+            if (!fhevmInstance) {
+              throw new Error("FHEVM instance is undefined");
+            }
 
-          setMessage("Decrypting payload...");
-          const s = res[0];
-          const sPrime = hex16ToBigint(sPrimeHex);
-          const sk =
-            BigInt(s ^ sPrime) & BigInt(BigInt(2) ** BigInt(128) - BigInt(1));
+            const sig = await FhevmDecryptionSignature.loadOrSign(
+              fhevmInstance,
+              [farewell.address as `0x${string}`],
+              ethersSigner,
+              fhevmDecryptionSignatureStorage
+            );
 
-          // Turn it back into a 16B AES key and import
-          const kRaw = bigintToKey16(sk);
-          const K = await aesImportRaw16(kRaw);
-          const plaintext = await decryptUtf8AesGcmPacked(
-            res.payload as `0x${string}`,
-            K
-          );
+            if (!sig) {
+              setRetrievedRecipientEmail("(decryption signature unavailable)");
+              setRetrievedSkShare("(decryption signature unavailable)");
+              return;
+            }
 
-          return {
-            skShare: res[0],
-            encodedRecipientEmail: res[1],
-            emailByteLen: Number(res[2]),
-            payload: plaintext,
-            publicMessage: res[4] as string,
-          } as DeliveryPackage;
+            const limbsHandles = res.encodedRecipientEmail as `0x${string}`[];
+            if (!Array.isArray(limbsHandles) || limbsHandles.length === 0) {
+              setRetrievedRecipientEmail("(no limbs)");
+              return;
+            }
+
+            // Build decrypt tasks and run
+            const emailTasks = limbsHandles.map((h) => ({
+              handle: h,
+              contractAddress: farewell.address as `0x${string}`,
+            }));
+
+            const emailDecMap = await fhevmInstance.userDecrypt(
+              emailTasks,
+              sig.privateKey,
+              sig.publicKey,
+              sig.signature,
+              sig.contractAddresses,
+              sig.userAddress,
+              sig.startTimestamp,
+              sig.durationDays
+            );
+
+            // Recompose UTF-8 from 32-byte big-endian limbs
+            const bytes: number[] = [];
+            for (const h of limbsHandles) {
+              const clear = emailDecMap[h] as bigint;
+              const limbHex = ethers.toBeHex(clear, 32);
+              const limbBytes = Array.from(ethers.getBytes(limbHex));
+              bytes.push(...limbBytes);
+            }
+            console.log("bytes ", bytes.length, " reconstructed");
+
+            const emailByteLen = Number(res.emailByteLen);
+            const trimmed = bytes.slice(0, emailByteLen);
+            console.log("trimmed to ", emailByteLen);
+            let emailText = "";
+            try {
+              emailText = ethers.toUtf8String(new Uint8Array(trimmed));
+            } catch {
+              emailText = "(invalid UTF-8 after decryption)";
+            }
+            setRetrievedRecipientEmail(emailText);
+            setRetrievedEmailLen(res.emailByteLen);
+            setRetrievedLimbCount(limbsHandles.length.toString());
+
+            // Decrypt skShare
+            const decSkShare = await fhevmInstance.userDecrypt(
+              [
+                {
+                  handle: res.skShare as `0x${string}`,
+                  contractAddress: farewell.address,
+                },
+              ],
+              sig.privateKey,
+              sig.publicKey,
+              sig.signature,
+              sig.contractAddresses,
+              sig.userAddress,
+              sig.startTimestamp,
+              sig.durationDays
+            );
+
+            setIsBusy(false);
+            setMessage("Decrypting payload...");
+            skShare = BigInt(decSkShare[res.skShare as `0x${string}`]);
+            setRetrievedSkShare(skShare);
+          } catch (e: unknown) {
+            if (e instanceof Error) {
+              setRetrievedRecipientEmail(
+                `(decrypt failed: ${String(e.message ?? e)})`
+              );
+            } else {
+              setRetrievedRecipientEmail(`(decrypt failed: ${String(e)})`);
+            }
+          }
+
+          try {
+            if(skShare === undefined) {
+              throw new Error("Couldn't load skShare");
+            }
+            const sPrime = hex16ToBigint(sPrimeHex);
+            const sk = skShare ^ (sPrime & (BigInt(2) ** BigInt(128) - BigInt(1)));
+
+            console.log("Computed sk");
+            console.log("sk =", sk.toString(16).padStart(32, "0"));
+            console.log("s     =", skShare.toString(16).padStart(32, "0"));
+            console.log("s'    =", sPrime.toString(16).padStart(32, "0"));
+            
+            // Turn it back into a 16B AES key and import
+            const kRaw = bigintToKey16(sk);
+            const K = await aesImportRaw16(kRaw);
+
+            const plaintext = await decryptUtf8AesGcmPacked(
+              res.payload as `0x${string}`,
+              K
+            );
+
+            console.log("Decrypted! {plaintext}");
+            setMessage("Done");
+            setRetrievedPayloadUtf8(plaintext);
+            setRetrievedPayloadHex(plaintext);
+          } catch (e: unknown) {
+            if (e instanceof Error) {
+              setRetrievedRecipientEmail(
+                `(decrypt failed: ${String(e.message ?? e)})`
+              );
+            } else {
+              setRetrievedRecipientEmail(`(decrypt failed: ${String(e)})`);
+            }
+          }
         } else {
           console.log("owner is NOT the signer");
           // Otherwise, use readonly provider but set the "from" override so msg.sender == target
@@ -292,11 +423,9 @@ export const useFarewell = (parameters: {
             farewell.abi,
             ethersReadonlyProvider
           );
-          // Ethers v5:
           const res = await contract.retrieve(target, index, {
             from: target,
           });
-          // If you're on Ethers v6, use: await contractRO.retrieve.staticCall(target, index, { from: target });
 
           setIsBusy(false);
           return {
@@ -307,6 +436,11 @@ export const useFarewell = (parameters: {
             publicMessage: res[4] as string,
           } as DeliveryPackage;
         }
+      } catch (e) {
+        setMessage(`local decryption failed: ${String(e)}`);
+        setRetrievedPayloadUtf8("");
+        setRetrievedPayloadUtf8("");
+        setRetrievedLimbCount("");
       } finally {
         setIsBusy(false);
       }
@@ -498,8 +632,7 @@ export const useFarewell = (parameters: {
           setMessage("Set s and/or s' (click Randomize if unsure).");
           throw new Error("s and s' cannot both be zero");
         }
-        
-        
+
         // 1) Compute sk = s XOR s' (128-bit)
         const sk = s ^ (sPrime & (BigInt(2) ** BigInt(128) - BigInt(1)));
 
@@ -507,7 +640,7 @@ export const useFarewell = (parameters: {
         const kRaw = bigintToKey16(sk); // 16 raw bytes
         const K = await aesImportRaw16(kRaw); // CryptoKey
         const encPayloadHex = await encryptUtf8AesGcmPacked(payload, K); // 0x(IV||CT)
-
+        console.log("Encrypted to", encPayloadHex);
         setMessage("Payload encrypted, preparing FHE encryption...");
 
         // Let UI breathe before WASM-heavy encrypt
@@ -704,6 +837,13 @@ export const useFarewell = (parameters: {
     // UX
     message,
     isBusy,
+    retrievedRecipientEmail,
+    retrievedSkShare,
+    retrievedEmailLen,
+    retrievedLimbCount,
+    retrievedPayloadHex,
+    retrievedPayloadUtf8,
+    retrievedPubMsg,
     // lifecycle
     register,
     registerWithParams,

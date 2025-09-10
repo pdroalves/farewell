@@ -12,7 +12,6 @@ import { ethers } from "ethers";
 import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
 
 export default function Farewell() {
-  const { storage: fhevmDecryptionSignatureStorage } = useInMemoryStorage();
   const {
     provider,
     chainId,
@@ -64,18 +63,6 @@ export default function Farewell() {
   const [retrieveOwner, setRetrieveOwner] = useState<`0x${string}` | "">("");
   const [retrieveIndex, setRetrieveIndex] = useState("0");
 
-  // Retrieve outputs (read-only boxes)
-  const [retrievedSkShare, setRetrievedSkShare] = useState<
-    string | bigint | boolean
-  >("");
-  const [retrievedEmailLen, setRetrievedEmailLen] = useState<string>("");
-  const [retrievedLimbCount, setRetrievedLimbCount] = useState<string>("");
-  const [retrievedPayloadHex, setRetrievedPayloadHex] = useState("");
-  const [retrievedPayloadUtf8, setRetrievedPayloadUtf8] = useState("");
-  const [retrievedPubMsg, setRetrievedPubMsg] = useState("");
-
-  // Recipient email (decrypted)
-  const [retrievedRecipientEmail, setRetrievedRecipientEmail] = useState("");
 
   // registration inputs (prefilled)
   const [checkInDays, setCheckInDays] = useState("30");
@@ -607,127 +594,39 @@ export default function Farewell() {
                   return;
                 }
                 const idx = BigInt(retrieveIndex || "0");
-                const res = await farewell.retrieve(owner, idx, sPrimeHex);
+                await farewell.retrieve(owner, idx, sPrimeHex, fhevmInstance);
 
-                // Always show raw payload/pm first
-                setRetrievedPayloadHex(res.payload);
-                try {
-                  setRetrievedPayloadUtf8(
-                    res.payload?.startsWith("0x")
-                      ? ethers.toUtf8String(res.payload as `0x${string}`)
-                      : String(res.payload ?? "")
-                  );
-                } catch {
-                  setRetrievedPayloadUtf8("Couldn't decode as UTF-8");
-                }
-                setRetrievedPubMsg(res.publicMessage ?? "");
-                setRetrievedEmailLen(String(res.emailByteLen));
-                setRetrievedLimbCount(
-                  Array.isArray(res.encodedRecipientEmail)
-                    ? String((res.encodedRecipientEmail as unknown[]).length)
-                    : "0"
-                );
-                // Decrypt skShare and recipient email if FHEVM is ready & signer present
-                if (
-                  !fhevmReady ||
-                  !fhevmInstance ||
-                  !ethersSigner ||
-                  !farewell.contractAddress
-                ) {
-                  return; // show lengths; user can still see raw data
-                }
-                setRetrievedSkShare("Decrypting...");
-                setRetrievedRecipientEmail("Decrypting..."); // reset
+                // // Always show raw payload/pm first
+                // setRetrievedPayloadHex(res.payload);
+                // try {
+                //   setRetrievedPayloadUtf8(
+                //     res.payload?.startsWith("0x")
+                //       ? ethers.toUtf8String(res.payload as `0x${string}`)
+                //       : String(res.payload ?? "")
+                //   );
+                // } catch {
+                //   setRetrievedPayloadUtf8("Couldn't decode as UTF-8");
+                // }
+                // setRetrievedPubMsg(res.publicMessage ?? "");
+                // setRetrievedEmailLen(String(res.emailByteLen));
+                // setRetrievedLimbCount(
+                //   Array.isArray(res.encodedRecipientEmail)
+                //     ? String((res.encodedRecipientEmail as unknown[]).length)
+                //     : "0"
+                // );
+                // // Decrypt skShare and recipient email if FHEVM is ready & signer present
+                // if (
+                //   !fhevmReady ||
+                //   !fhevmInstance ||
+                //   !ethersSigner ||
+                //   !farewell.contractAddress
+                // ) {
+                //   return; // show lengths; user can still see raw data
+                // }
+                // setRetrievedSkShare("Decrypting...");
+                // setRetrievedRecipientEmail("Decrypting..."); // reset
 
-                try {
-                  const sig = await FhevmDecryptionSignature.loadOrSign(
-                    fhevmInstance,
-                    [farewell.contractAddress as `0x${string}`],
-                    ethersSigner,
-                    fhevmDecryptionSignatureStorage
-                  );
-
-                  if (!sig) {
-                    setRetrievedRecipientEmail(
-                      "(decryption signature unavailable)"
-                    );
-                    setRetrievedSkShare("(decryption signature unavailable)");
-                    return;
-                  }
-
-                  const limbsHandles =
-                    res.encodedRecipientEmail as `0x${string}`[];
-                  if (
-                    !Array.isArray(limbsHandles) ||
-                    limbsHandles.length === 0
-                  ) {
-                    setRetrievedRecipientEmail("(no limbs)");
-                    return;
-                  }
-
-                  // Build decrypt tasks and run
-                  const emailTasks = limbsHandles.map((h) => ({
-                    handle: h,
-                    contractAddress: farewell.contractAddress as `0x${string}`,
-                  }));
-
-                  const emailDecMap = await fhevmInstance.userDecrypt(
-                    emailTasks,
-                    sig.privateKey,
-                    sig.publicKey,
-                    sig.signature,
-                    sig.contractAddresses,
-                    sig.userAddress,
-                    sig.startTimestamp,
-                    sig.durationDays
-                  );
-
-                  // Recompose UTF-8 from 32-byte big-endian limbs
-                  const bytes: number[] = [];
-                  for (const h of limbsHandles) {
-                    const clear = emailDecMap[h] as bigint;
-                    const limbHex = ethers.toBeHex(clear, 32);
-                    const limbBytes = Array.from(ethers.getBytes(limbHex));
-                    bytes.push(...limbBytes);
-                  }
-                  const trimmed = bytes.slice(0, res.emailByteLen);
-                  let emailText = "";
-                  try {
-                    emailText = ethers.toUtf8String(new Uint8Array(trimmed));
-                  } catch {
-                    emailText = "(invalid UTF-8 after decryption)";
-                  }
-                  setRetrievedRecipientEmail(emailText);
-
-                  // Decrypt skShare
-                  const decSkShare = await fhevmInstance.userDecrypt(
-                    [
-                      {
-                        handle: res.skShare as `0x${string}`,
-                        contractAddress: farewell.contractAddress,
-                      },
-                    ],
-                    sig.privateKey,
-                    sig.publicKey,
-                    sig.signature,
-                    sig.contractAddresses,
-                    sig.userAddress,
-                    sig.startTimestamp,
-                    sig.durationDays
-                  );
-                  console.log("decSkShare", decSkShare);
-                  setRetrievedSkShare(decSkShare[res.skShare as `0x${string}`]);
-                } catch (e: unknown) {
-                  if (e instanceof Error) {
-                    setRetrievedRecipientEmail(
-                      `(decrypt failed: ${String(e.message ?? e)})`
-                    );
-                  } else {
-                    setRetrievedRecipientEmail(
-                      `(decrypt failed: ${String(e)})`
-                    );
-                  }
-                }
+                
               })().catch((e) => alert(String(e?.message ?? e)))
             }
             className={btnPrimary}
@@ -743,7 +642,7 @@ export default function Farewell() {
               <label className={labelClass}>Recipient Email (decrypted)</label>
               <input
                 className={inputReadonlyClass + " font-mono w-full"}
-                value={retrievedRecipientEmail}
+                value={farewell.retrievedRecipientEmail}
                 readOnly
                 placeholder="— requires claim + FHEVM ready —"
               />
@@ -754,14 +653,14 @@ export default function Farewell() {
               <div className="grid grid-cols-2 gap-3">
                 <input
                   className={inputReadonlyClass}
-                  value={retrievedEmailLen}
+                  value={farewell.retrievedEmailLen}
                   readOnly
                   placeholder="byteLen"
                   aria-label="email byte length"
                 />
                 <input
                   className={inputReadonlyClass}
-                  value={retrievedLimbCount}
+                  value={farewell.retrievedLimbCount}
                   readOnly
                   placeholder="limbs"
                   aria-label="limbs count"
@@ -775,7 +674,7 @@ export default function Farewell() {
             <div className="grid grid-cols-2 gap-3">
               <input
                 className={inputReadonlyClass}
-                value={retrievedSkShare.toString()}
+                value={farewell.retrievedSkShare.toString()}
                 readOnly
                 placeholder="shared secret"
                 aria-label="email byte length"
@@ -787,7 +686,7 @@ export default function Farewell() {
             <label className={labelClass}>payload (UTF-8, best effort)</label>
             <textarea
               className={inputReadonlyClass + " w-full min-h-[160px] resize-y"}
-              value={retrievedPayloadUtf8}
+              value={farewell.retrievedPayloadUtf8}
               readOnly
               placeholder="hidden message (as UTF-8, if possible)"
             />
@@ -799,7 +698,7 @@ export default function Farewell() {
               className={
                 inputReadonlyClass + " w-full min-h-[160px] font-mono resize-y"
               }
-              value={retrievedPayloadHex}
+              value={farewell.retrievedPayloadHex}
               readOnly
               placeholder="hidden message (as hex)"
             />
@@ -809,7 +708,7 @@ export default function Farewell() {
             <label className={labelClass}>publicMessage</label>
             <textarea
               className={inputReadonlyClass + " w-full min-h-[160px] resize-y"}
-              value={retrievedPubMsg}
+              value={farewell.retrievedPubMsg}
               readOnly
               placeholder="—"
             />
