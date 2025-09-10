@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { isHex } from "viem";
 import { useFhevm } from "@/fhevm/useFhevm";
 import { useInMemoryStorage } from "../hooks/useInMemoryStorage";
@@ -8,6 +8,8 @@ import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSign
 import { useFarewell } from "@/hooks/useFarewell";
 import { FhevmDecryptionSignature } from "@/fhevm/FhevmDecryptionSignature";
 import { ethers } from "ethers";
+
+import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
 
 export default function Farewell() {
   const { storage: fhevmDecryptionSignatureStorage } = useInMemoryStorage();
@@ -51,7 +53,6 @@ export default function Farewell() {
   const [showDetails, setShowDetails] = useState(false); // hide chain/status cards by default
 
   const [email, setEmail] = useState("");
-  const [skShare, setSkShare] = useState("");
   const [payload, setPayload] = useState<string>("");
   const [publicMessage, setPublicMessage] = useState("");
   // markDeceased input (allow empty string for UX)
@@ -82,6 +83,59 @@ export default function Farewell() {
 
   const [lastCount, setLastCount] = useState<string>("");
 
+  // AES secret key
+  const [sHex, setSHex] = useState<`0x${string}`>("0x");
+  const [sPrimeHex, setSPrimeHex] = useState<`0x${string}`>("0x");
+
+  // Randomizers
+  function handleRandSPrime() {
+    setSPrimeHex(randomHex16());
+  }
+  function handleRandS() {
+    setSHex(randomHex16());
+  }
+
+  const xorHex = useMemo(() => {
+    try {
+      const v = hex16ToBigint(sPrimeHex) ^ hex16ToBigint(sHex);
+      return bigintToHex16(v);
+    } catch {
+      return "0x";
+    }
+  }, [sHex, sPrimeHex]);
+
+  function handleSChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let v = e.target.value.trim().toLowerCase();
+    if (!v.startsWith("0x")) v = "0x" + v;
+    v = v.replace(/[^0-9a-f]/g, "");
+    if (v.length > 64) v = v.slice(0, 64);
+    setSHex(("0x" + v) as `0x${string}`);
+  }
+
+  function handleSPrimeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let v = e.target.value.trim().toLowerCase();
+    if (!v.startsWith("0x")) v = "0x" + v; // ensure 0x prefix
+    v = v.replace(/[^0-9a-f]/g, ""); // strip non-hex chars
+    if (v.length > 64) v = v.slice(0, 64); // max 32 bytes = 64 hex chars
+    setSPrimeHex(("0x" + v) as `0x${string}`);
+  }
+
+  // Put this in a utils file or top of the component
+  function clampHex128Input(raw: string): `0x${string}` {
+    let v = raw.trim().toLowerCase();
+    if (v.startsWith("0x")) v = v.slice(2); // drop prefix
+    v = v.replace(/[^0-9a-f]/g, ""); // keep only hex
+    if (v.length > 64) v = v.slice(0, 64); // max 32 bytes
+    return ("0x" + v) as `0x${string}`;
+  }
+  function handlePasteClamp(
+    e: React.ClipboardEvent<HTMLInputElement>,
+    setter: (v: `0x${string}`) => void
+  ) {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text");
+    setter(clampHex128Input(text));
+  }
 
   // === Style tokens (Tailwind) ==============================================
   const cardClass =
@@ -319,7 +373,72 @@ export default function Farewell() {
           />
         </div>
       </section>
+      {/* Set cryptographic keys */}
+      <section className={sectionClass}>
+        <h2 className="text-xl font-semibold text-slate-800">
+          Set AES Key and s
+        </h2>
 
+        <div className="flex flex-wrap items-end gap-3">
+          <p className="text-sm text-slate-500">
+            Provide <code>s&apos;</code> and <code>s</code> (128-bit each, hex). We
+            compute <code>sk = s&apos; ⊕ s</code>. This <code>s</code> becomes the
+            share of the secret used to encrypt your payload and is the value
+            stored under fhEVM. <code>s&apos;</code> must be shared with the
+            recipient so they can reconstruct <code>sk</code>.
+          </p>
+          <div className="flex flex-col">
+            <label className={labelClass}>s (hex)</label>
+            <input
+              className={inputClass + " w-36"}
+              placeholder="0x… (32 hex bytes)"
+              value={sHex}
+              onChange={handleSChange}
+              onPaste={(e) => handlePasteClamp(e, setSHex)}
+              maxLength={66}
+              inputMode="text"
+              pattern="0x[0-9a-fA-F]*"
+              spellCheck={false}
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className={labelClass}>s&apos;(hex)</label>
+            <input
+              className={inputClass + " w-36"}
+              placeholder="0x… (32 hex bytes)"
+              value={sPrimeHex}
+              onChange={handleSPrimeChange}
+              onPaste={(e) => handlePasteClamp(e, setSPrimeHex)}
+              maxLength={66}
+              inputMode="text"
+              pattern="0x[0-9a-fA-F]*"
+              spellCheck={false}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              disabled={farewell.isBusy || !isConnected}
+              onClick={handleRandS}
+              className={btnPrimary}
+            >
+              randomize s
+            </button>
+
+            <button
+              disabled={farewell.isBusy || !isConnected}
+              onClick={handleRandSPrime}
+              className={btnSecondary}
+            >
+              randomize s&apos;
+            </button>
+          </div>
+          <div className="text-xs text-slate-500">
+            sk = s ⊕ s&apos; = <span className="font-mono">{xorHex}</span>
+          </div>
+        </div>
+      </section>
       {/* Add Message */}
       <section className={sectionClass}>
         <h2 className="text-xl font-semibold text-slate-800">Add Message</h2>
@@ -329,13 +448,6 @@ export default function Farewell() {
             placeholder="recipient email (UTF-8)"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            className={inputClass}
-            placeholder="skShare (e.g., 42)"
-            inputMode="numeric"
-            value={skShare}
-            onChange={(e) => setSkShare(e.target.value)}
           />
           <textarea
             className={inputClass + " min-h-[100px]"}
@@ -355,15 +467,15 @@ export default function Farewell() {
               disabled={farewell.isBusy || !fhevmReady}
               onClick={() =>
                 (async () => {
-                  const share = BigInt(skShare);
                   const payloadValue = isHex(payload)
                     ? (payload as `0x${string}`)
                     : payload;
 
                   await farewell.addMessage(
                     email,
-                    share,
                     payloadValue,
+                    sHex,
+                    sPrimeHex,
                     publicMessage.trim() ? publicMessage : undefined
                   );
                 })().catch((e) =>
@@ -495,7 +607,7 @@ export default function Farewell() {
                   return;
                 }
                 const idx = BigInt(retrieveIndex || "0");
-                const res = await farewell.retrieve(owner, idx);
+                const res = await farewell.retrieve(owner, idx, sPrimeHex);
 
                 // Always show raw payload/pm first
                 setRetrievedPayloadHex(res.payload);
