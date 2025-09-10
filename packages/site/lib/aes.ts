@@ -90,20 +90,28 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 // Be explicit about AES-GCM key import
-export async function aesImportRaw16(raw: Uint8Array): Promise<CryptoKey> {
-  // Ensure we pass a BufferSource (ArrayBufferView is fine)
-  const view = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
-  if (view.byteLength !== 16) {
-    throw new Error(`AES-128 key must be 16 bytes, got ${view.byteLength}`);
+export async function aesImportRaw16(raw: Uint8Array | ArrayBuffer): Promise<CryptoKey> {
+  // Normalize to a 16-byte ArrayBuffer (not ArrayBufferLike)
+  let ab: ArrayBuffer;
+  if (raw instanceof ArrayBuffer) {
+    if (raw.byteLength !== 16) throw new Error(`AES-128 key must be 16 bytes, got ${raw.byteLength}`);
+    ab = raw;
+  } else {
+    if (raw.byteLength !== 16) throw new Error(`AES-128 key must be 16 bytes, got ${raw.byteLength}`);
+    // Ensure backing store is a real ArrayBuffer
+    ab = new ArrayBuffer(16);
+    new Uint8Array(ab).set(raw);
   }
+
   return crypto.subtle.importKey(
     "raw",
-    view,                      // BufferSource
+    ab,                 // <- ArrayBuffer (cleanly satisfies BufferSource)
     { name: "AES-GCM" },
-    true,
+    false,              // set to true if you want to export/print later
     ["encrypt", "decrypt"]
   );
 }
+
 
 /**
  * packed = hex string of: IV(12 bytes) || CIPHERTEXT||TAG(16 bytes tag by default)
@@ -117,7 +125,7 @@ export async function decryptUtf8AesGcmPacked(
 ): Promise<string> {
   try {
     console.log("AES-GCM decrypt:", packed);
-  await printKeyHex(key);
+  // await printKeyHex(key);
 
     const data = hexToBytes(packed);
     // Need at least 12 (IV) + 16 (tag)

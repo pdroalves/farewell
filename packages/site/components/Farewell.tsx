@@ -3,10 +3,8 @@
 import React, { useState, useMemo } from "react";
 import { isHex } from "viem";
 import { useFhevm } from "@/fhevm/useFhevm";
-import { useInMemoryStorage } from "../hooks/useInMemoryStorage";
 import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSigner";
 import { useFarewell } from "@/hooks/useFarewell";
-import { FhevmDecryptionSignature } from "@/fhevm/FhevmDecryptionSignature";
 import { ethers } from "ethers";
 
 import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
