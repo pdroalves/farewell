@@ -19,8 +19,10 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-2">
-      <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
-      {subtitle && <p className="text-sm text-slate-600 mt-1">{subtitle}</p>}
+      <h2 className="text-lg sm:text-xl font-semibold text-slate-800">{title}</h2>
+      {subtitle && (
+        <p className="text-xs sm:text-sm text-slate-600 mt-1">{subtitle}</p>
+      )}
     </div>
   );
 }
@@ -163,35 +165,30 @@ export default function Farewell() {
 
   // === Style tokens (Tailwind) ==============================================
   const cardClass =
-    "rounded-2xl border border-slate-200 bg-slate-50/80 backdrop-blur-sm shadow-sm p-5";
+    "rounded-2xl border border-slate-200 bg-slate-50/80 backdrop-blur-sm shadow-sm p-4 sm:p-5";
   const sectionClass =
-    "rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3";
-  const titleClass = "font-semibold text-slate-800 text-lg";
+    "rounded-2xl border border-slate-200 bg-white shadow-sm p-4 sm:p-5 space-y-3";
+  const titleClass = "font-semibold text-slate-800 text-base sm:text-lg";
   const inputClass =
     "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 " +
     "focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
   const inputReadonlyClass =
-    "w-40 rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 font-mono text-slate-800";
-  const labelClass = "text-sm font-medium text-slate-600 mb-1";
+    "w-full rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 font-mono text-slate-800";
+  const labelClass = "text-xs sm:text-sm font-medium text-slate-600 mb-1";
+  const btnBase =
+    "inline-flex items-center justify-center rounded-xl px-4 py-2 text-center transition";
   const btnPrimary =
-    "inline-flex items-center rounded-xl bg-sky-600 px-4 py-2 font-semibold text-white shadow-sm " +
-    "hover:bg-sky-700 disabled:opacity-50 disabled:pointer-events-none " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500";
+    `${btnBase} bg-sky-600 font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500`;
   const btnSecondary =
-    "inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-slate-700 " +
-    "hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none " +
-    "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300";
+    `${btnBase} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300`;
 
   if (!isConnected) {
     return (
-      <div className="mx-auto max-w-md p-8">
-        <div className={cardClass + " text-center"}>
-          <h1 className="text-2xl font-bold text-slate-800 mb-4">
-            Connect your wallet
-          </h1>
-          <p className="text-sm text-slate-600 mb-4">
-            Farewell uses your wallet to sign and send transactions to the
-            chain. We do not custody your keys.
+      <div className="mx-auto max-w-md p-4 sm:p-8">
+        <div className={cardClass + " text-center space-y-3"}>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Connect your wallet</h1>
+          <p className="text-xs sm:text-sm text-slate-600">
+            Farewell uses your wallet to sign and send transactions to the chain. We do not custody your keys.
           </p>
           <button className={btnPrimary + " w-full"} onClick={connect}>
             <span className="text-base">Connect to MetaMask</span>
@@ -203,16 +200,13 @@ export default function Farewell() {
 
   if (farewell.isDeployed === false) {
     return (
-      <div className="mx-auto max-w-3xl p-6">
+      <div className="mx-auto max-w-3xl p-4 sm:p-6">
         <div className={cardClass}>
           <p className="text-slate-800">
-            Farewell is not deployed on chain{" "}
-            <span className="font-mono">{chainId}</span>.
+            Farewell is not deployed on chain <span className="font-mono">{chainId}</span>.
           </p>
           <Callout>
-            The UI loads but the contract for this chain isn’t available. Switch
-            networks in MetaMask (e.g., Sepolia or your Hardhat local node) to
-            continue.
+            The UI loads but the contract for this chain isn’t available. Switch networks in MetaMask (e.g., Sepolia or your Hardhat local node) to continue.
           </Callout>
         </div>
       </div>
@@ -249,11 +243,11 @@ export default function Farewell() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl p-6 space-y-6">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Toggle button */}
       <div className="flex justify-end">
         <button
-          className={btnSecondary}
+          className={btnSecondary + " w-full sm:w-auto"}
           onClick={() => setShowDetails(!showDetails)}
         >
           {showDetails ? "Hide chain / status" : "Show chain / status"}
@@ -265,9 +259,8 @@ export default function Farewell() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <div className={cardClass + " lg:col-span-8"}>
               <p className={titleClass}>Chain & Wallet</p>
-              <p className="text-sm text-slate-600 mb-2">
-                Quick debugging info about your current network, account and the
-                bound Farewell contract.
+              <p className="text-xs sm:text-sm text-slate-600 mb-2">
+                Quick debugging info about your current network, account and the bound Farewell contract.
               </p>
               {printProperty("ChainId", chainId)}
               {printProperty(
@@ -278,27 +271,18 @@ export default function Farewell() {
                     : `{ length: ${accounts.length}, [${accounts[0]}, ...] }`
                   : "undefined"
               )}
-              {printProperty(
-                "Signer",
-                ethersSigner ? accounts?.[0] : "No signer"
-              )}
+              {printProperty("Signer", ethersSigner ? accounts?.[0] : "No signer")}
               <div className="mt-3 h-px bg-slate-200" />
-              <div className="mt-3">
-                {printProperty("Contract", farewell.contractAddress)}
-              </div>
+              <div className="mt-3">{printProperty("Contract", farewell.contractAddress)}</div>
               {printBooleanProperty("isDeployed", Boolean(farewell.isDeployed))}
             </div>
 
             <div className={cardClass + " lg:col-span-4"}>
               <p className={titleClass}>Status</p>
-              <p className="text-sm text-slate-600 mb-2">
-                Internal SDK state. If something looks off, try reconnecting
-                your wallet or switching chains.
+              <p className="text-xs sm:text-sm text-slate-600 mb-2">
+                Internal SDK state. If something looks off, try reconnecting your wallet or switching chains.
               </p>
-              {printProperty(
-                "Fhevm Instance",
-                fhevmInstance ? "OK" : "undefined"
-              )}
+              {printProperty("Fhevm Instance", fhevmInstance ? "OK" : "undefined")}
               {printProperty("Fhevm Status", fhevmStatus)}
               {printProperty("Fhevm Error", fhevmError ?? "No Error")}
               {printProperty("isBusy", farewell.isBusy)}
@@ -308,15 +292,15 @@ export default function Farewell() {
       )}
 
       {friendlyName && (
-        <div className="text-xl font-semibold text-slate-800">
+        <div className="text-lg sm:text-xl font-semibold text-slate-800">
           Hello, {friendlyName}!{" "}
           {farewell && accounts?.[0] && (
             <span className="font-normal text-slate-600">
               {farewell.isRegistered === undefined
                 ? "(checking…)"
                 : farewell.isRegistered
-                  ? "You are registered :-)"
-                  : "You are not registered :-("}
+                ? "You are registered :-)"
+                : "You are not registered :-("}
             </span>
           )}
         </div>
@@ -335,44 +319,42 @@ export default function Farewell() {
           subtitle="Register on Farewell and define your check-in cadence. As long as you remain active (by pinging periodically), your messages stay sealed. Once both the check-in and grace periods expire, your messages become claimable. If you’re already registered, this will update your settings."
         />
         <Callout>
-          <ul className="list-disc pl-5 space-y-1">
+          <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
             <li>
-              <strong>Register</strong> writes your settings on‑chain (new or
-              updated).
+              <strong>Register</strong> writes your settings on‑chain (new or updated).
             </li>
             <li>
-              <strong>Ping</strong> refreshes your <em>lastCheckIn</em>{" "}
-              timestamp. No other data changes.
+              <strong>Ping</strong> refreshes your <em>lastCheckIn</em> timestamp. No other data changes.
             </li>
           </ul>
         </Callout>
 
-        <div className="flex flex-wrap items-end gap-3 mt-2">
-          <div className="flex flex-col">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 mt-2">
+          <div className="flex flex-col sm:w-auto w-full">
             <label className={labelClass}>Check‑in (days)</label>
             <input
               type="number"
               min={1}
               step={1}
-              className={inputClass + " w-36"}
+              className={inputClass + " w-full sm:w-36"}
               value={checkInDays}
               onChange={(e) => setCheckInDays(e.target.value)}
             />
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col sm:w-auto w-full">
             <label className={labelClass}>Grace (days)</label>
             <input
               type="number"
               min={0}
               step={1}
-              className={inputClass + " w-36"}
+              className={inputClass + " w-full sm:w-36"}
               value={graceDays}
               onChange={(e) => setGraceDays(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-1">
             <button
               disabled={farewell.isBusy || !isConnected}
               onClick={() => {
@@ -384,7 +366,7 @@ export default function Farewell() {
                   .registerWithParams(checkInSec, graceSec)
                   .catch((e) => alert(String(e?.message ?? e)));
               }}
-              className={btnPrimary}
+              className={btnPrimary + " w-full sm:w-auto"}
             >
               register
             </button>
@@ -392,7 +374,7 @@ export default function Farewell() {
             <button
               disabled={farewell.isBusy || !isConnected}
               onClick={() => farewell.ping().catch(() => {})}
-              className={btnSecondary}
+              className={btnSecondary + " w-full sm:w-auto"}
             >
               ping()
             </button>
@@ -403,7 +385,7 @@ export default function Farewell() {
           title="Message Count"
           subtitle="Query how many messages you’ve added so far (stored under your address)."
         />
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <button
             disabled={farewell.isBusy || !fhevmReady}
             onClick={() =>
@@ -412,13 +394,13 @@ export default function Farewell() {
                 .then((n) => setLastCount(n.toString()))
                 .catch(() => {})
             }
-            className={btnPrimary}
+            className={btnPrimary + " w-full sm:w-auto"}
           >
             Count
           </button>
 
           <input
-            className={inputReadonlyClass}
+            className={inputReadonlyClass + " sm:w-40"}
             value={lastCount || ""}
             onChange={() => {}}
             readOnly
@@ -435,24 +417,21 @@ export default function Farewell() {
           subtitle="Choose s and s′ to compose the secret key. Your AES key is defined as sk = s′ ⊕ s. The share s is kept under FHE permissions on‑chain; s′ is your off‑chain counterpart to hand to the recipient."
         />
         <Callout title="Under the hood">
-          <ul className="list-disc pl-5 space-y-1">
+          <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
             <li>
-              <code>s</code> is encrypted and stored through the fhEVM flow;
-              only authorized readers can decrypt it after <em>claim</em>.
+              <code>s</code> is encrypted and stored through the fhEVM flow; only authorized readers can decrypt it after <em>claim</em>.
             </li>
             <li>
-              <code>s′</code> never touches the chain. You must deliver it
-              out‑of‑band to the recipient.
+              <code>s′</code> never touches the chain. You must deliver it out‑of‑band to the recipient.
             </li>
             <li>
-              When retrieving, the app recombines <code>sk = s ⊕ s′</code>{" "}
-              client‑side to decrypt the payload.
+              When retrieving, the app recombines <code>sk = s ⊕ s′</code> client‑side to decrypt the payload.
             </li>
           </ul>
         </Callout>
 
         <Callout title="Choosing s and s′" variant="danger">
-          <ul className="list-disc pl-5 space-y-1">
+          <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
             <li>
               You can choose not to set <code>s′</code>. In this case you don′t have to share anything with the recipient. On the other hand, this means that whoever retrieve the message will be able to decrypt it, since <code>sk = s</code> .
             </li>
@@ -460,13 +439,13 @@ export default function Farewell() {
               You may choose not to set <code>s</code>, but this is <b>not recommended</b>. In that case, the recipient, who receives <code>s′</code>, would possess the entire secret key. Because the encrypted message is stored publicly on-chain, the recipient could retrieve and decrypt it prematurely.
             </li>
           </ul>
-          </Callout>
+        </Callout>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
+          <div className="flex flex-col sm:w-auto w-full">
             <label className={labelClass}>s (hex)</label>
             <input
-              className={inputClass + " w-36"}
+              className={inputClass}
               placeholder="0x… (32 hex bytes)"
               value={sHex}
               onChange={handleSChange}
@@ -478,10 +457,10 @@ export default function Farewell() {
             />
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col sm:w-auto w-full">
             <label className={labelClass}>s′ (hex)</label>
             <input
-              className={inputClass + " w-36"}
+              className={inputClass}
               placeholder="0x… (32 hex bytes)"
               value={sPrimeHex}
               onChange={handleSPrimeChange}
@@ -493,11 +472,11 @@ export default function Farewell() {
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <button
               disabled={farewell.isBusy || !isConnected}
               onClick={handleRandS}
-              className={btnPrimary}
+              className={btnPrimary + " w-full sm:w-auto"}
             >
               randomize s
             </button>
@@ -505,12 +484,12 @@ export default function Farewell() {
             <button
               disabled={farewell.isBusy || !isConnected}
               onClick={handleRandSPrime}
-              className={btnSecondary}
+              className={btnSecondary + " w-full sm:w-auto"}
             >
               randomize s′
             </button>
           </div>
-          <div className="text-xs text-slate-500">
+          <div className="text-[10px] sm:text-xs text-slate-500">
             sk = s ⊕ s′ = <span className="font-mono">{xorHex}</span>
           </div>
         </div>
@@ -523,13 +502,10 @@ export default function Farewell() {
           subtitle="Store an encrypted payload and the recipient’s email metadata on‑chain. You choose whether the payload is a hex blob (0x…) or plain UTF‑8 text (we’ll convert)."
         />
         <Callout title="What happens on click?">
-          <ul className="list-disc pl-5 space-y-1">
+          <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+            <li>We encrypt the on‑chain <em>Message</em> using your inputs.</li>
             <li>
-              We encrypt the on‑chain <em>Message</em> using your inputs.
-            </li>
-            <li>
-              <code>s</code> and the recipient address are handled through FHE permissions so only the
-              rightful claimer can decrypt later.
+              <code>s</code> and the recipient address are handled through FHE permissions so only the rightful claimer can decrypt later.
             </li>
             <li>The transaction is sent with your wallet. Gas costs apply.</li>
           </ul>
@@ -554,7 +530,7 @@ export default function Farewell() {
             onChange={(e) => setPublicMessage(e.target.value)}
           />
 
-          <div className="flex justify-end">
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             <button
               disabled={farewell.isBusy || !fhevmReady}
               onClick={() =>
@@ -574,7 +550,7 @@ export default function Farewell() {
                   alert(`Add Message failed:\n${String(e?.message ?? e)}`)
                 )
               }
-              className={btnPrimary}
+              className={btnPrimary + " w-full sm:w-auto"}
             >
               Add Message
             </button>
@@ -589,8 +565,7 @@ export default function Farewell() {
           subtitle="Anyone can call this after a user’s check‑in + grace have both elapsed. It flips the on‑chain flag that allows a message to be claimed."
         />
         <Callout>
-          Try to mark an address as deceased. The contract will
-          revert if the timing conditions are not met.
+          Try to mark an address as deceased. The contract will revert if the timing conditions are not met.
         </Callout>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto] items-end mt-2">
@@ -600,9 +575,7 @@ export default function Farewell() {
               className={inputClass + " font-mono"}
               placeholder={accounts?.[0] ?? "0x0000…"}
               value={deceasedTarget}
-              onChange={(e) =>
-                setDeceasedTarget(e.target.value as `0x${string}`)
-              }
+              onChange={(e) => setDeceasedTarget(e.target.value as `0x${string}`)}
             />
           </div>
 
@@ -613,7 +586,7 @@ export default function Farewell() {
                 .markDeceased(deceasedTarget || undefined)
                 .catch((e) => alert(String(e?.message ?? e)))
             }
-            className={btnPrimary}
+            className={btnPrimary + " w-full sm:w-auto"}
           >
             markDeceased()
           </button>
@@ -627,8 +600,7 @@ export default function Farewell() {
           subtitle="The intended recipient (or notifier) calls this to gain permission to read the FHE‑protected fields (email limbs and skShare)."
         />
         <Callout title="Under the hood">
-          The contract grants FHE read permissions to the claimer, which is known as the <em>notifier</em>.
-           For 24 hours, only the <em>notifier</em> may claim; afterwards, it becomes available to anyone.
+          The contract grants FHE read permissions to the claimer, which is known as the <em>notifier</em>. For 24 hours, only the <em>notifier</em> may claim; afterwards, it becomes available to anyone.
         </Callout>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end mt-2">
@@ -645,7 +617,7 @@ export default function Farewell() {
           <div className="flex flex-col">
             <label className={labelClass}>Index</label>
             <input
-              className={inputClass + " w-28"}
+              className={inputClass}
               inputMode="numeric"
               value={claimIndex}
               onChange={(e) => setClaimIndex(e.target.value)}
@@ -655,8 +627,7 @@ export default function Farewell() {
           <button
             disabled={farewell.isBusy || !isConnected}
             onClick={() => {
-              const owner = (claimOwner ||
-                (accounts?.[0] as `0x${string}`)) as `0x${string}`;
+              const owner = (claimOwner || (accounts?.[0] as `0x${string}`)) as `0x${string}`;
               if (!owner) {
                 alert("Provide an owner address or connect your wallet");
                 return;
@@ -664,10 +635,10 @@ export default function Farewell() {
               const idx = BigInt(claimIndex || "0");
               farewell
                 .claim(owner, idx)
-                .then(() => (alert("Claim succeeded")))
+                .then(() => alert("Claim tx sent."))
                 .catch((e) => alert(String(e?.message ?? e)));
             }}
-            className={btnPrimary}
+            className={btnPrimary + " w-full sm:w-auto"}
           >
             claim()
           </button>
@@ -678,11 +649,10 @@ export default function Farewell() {
       <section className={sectionClass}>
         <SectionHeader
           title="Retrieve"
-          subtitle="Fetch the message data. If you’re authorized and FHE is ready, the UI will decrypt the email and skShare client‑side; then it uses s′ to reconstruct sk and (optionally) decrypt your payload."
+          subtitle="Fetch the message data. If you’re authorized and FHE is ready, the UI will decrypt the email and skShare client‑side; then it uses skShare as s to reconstruct sk and decrypt your payload."
         />
-        <Callout>
-          Tip: make sure you’ve set <code>s′</code> above before retrieving;
-          otherwise recombining <code>sk</code> will be incomplete.
+        <Callout variant="warning" title="Important">
+          Make sure you’ve set <code>s′</code> above before retrieving; otherwise recombining <code>sk</code> will be impossible.
         </Callout>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end mt-2">
@@ -692,16 +662,14 @@ export default function Farewell() {
               className={inputClass + " font-mono"}
               placeholder={accounts?.[0] ?? "0x0000…"}
               value={retrieveOwner}
-              onChange={(e) =>
-                setRetrieveOwner(e.target.value as `0x${string}`)
-              }
+              onChange={(e) => setRetrieveOwner(e.target.value as `0x${string}`)}
             />
           </div>
 
           <div className="flex flex-col">
             <label className={labelClass}>Index</label>
             <input
-              className={inputClass + " w-28"}
+              className={inputClass}
               inputMode="numeric"
               value={retrieveIndex}
               onChange={(e) => setRetrieveIndex(e.target.value)}
@@ -712,8 +680,7 @@ export default function Farewell() {
             disabled={farewell.isBusy || !isConnected}
             onClick={() =>
               (async () => {
-                const owner = (retrieveOwner ||
-                  (accounts?.[0] as `0x${string}`)) as `0x${string}`;
+                const owner = (retrieveOwner || (accounts?.[0] as `0x${string}`)) as `0x${string}`;
                 if (!owner) {
                   alert("Provide an owner address or connect your wallet");
                   return;
@@ -722,7 +689,7 @@ export default function Farewell() {
                 await farewell.retrieve(owner, idx, sPrimeHex, fhevmInstance);
               })().catch((e) => alert(String(e?.message ?? e)))
             }
-            className={btnPrimary}
+            className={btnPrimary + " w-full sm:w-auto"}
           >
             retrieve()
           </button>
@@ -764,7 +731,7 @@ export default function Farewell() {
 
           <div className="flex flex-col">
             <label className={labelClass}>skShare</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input
                 className={inputReadonlyClass}
                 value={farewell.retrievedSkShare.toString()}
@@ -788,9 +755,7 @@ export default function Farewell() {
           <div className="flex flex-col">
             <label className={labelClass}>payload (hex)</label>
             <textarea
-              className={
-                inputReadonlyClass + " w-full min-h-[160px] font-mono resize-y"
-              }
+              className={inputReadonlyClass + " w-full min-h-[160px] font-mono resize-y"}
               value={farewell.retrievedPayloadHex}
               readOnly
               placeholder="hidden message (as hex)"
@@ -810,9 +775,7 @@ export default function Farewell() {
       </section>
 
       {!farewell.isDeployed && (
-        <p className="text-sm text-amber-600">
-          Farewell is not deployed for the current chain.
-        </p>
+        <p className="text-xs sm:text-sm text-amber-600">Farewell is not deployed for the current chain.</p>
       )}
     </div>
   );
@@ -840,23 +803,20 @@ function printProperty(name: string, value: unknown) {
   }
 
   return (
-    <p className="text-slate-700">
+    <p className="text-slate-700 text-sm">
       <span className="text-slate-500">{name}:</span>{" "}
-      <span className="font-mono font-semibold text-slate-900">
-        {displayValue}
-      </span>
+      <span className="font-mono font-semibold text-slate-900 break-all">{displayValue}</span>
     </p>
   );
 }
 
 function printBooleanProperty(name: string, value: boolean) {
   return (
-    <p className="text-slate-700">
+    <p className="text-slate-700 text-sm">
       <span className="text-slate-500">{name}:</span>{" "}
       <span
         className={
-          "font-mono font-semibold " +
-          (value ? "text-green-600" : "text-rose-600")
+          "font-mono font-semibold " + (value ? "text-green-600" : "text-rose-600")
         }
       >
         {String(value)}

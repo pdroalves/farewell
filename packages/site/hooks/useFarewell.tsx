@@ -27,7 +27,7 @@ import {
   bigintToKey16,
   aesImportRaw16,
   encryptUtf8AesGcmPacked,
-  decryptUtf8AesGcmPacked,
+  decryptAesGcmPackedDual,
 } from "@/lib/aes";
 import { useInMemoryStorage } from "./useInMemoryStorage";
 
@@ -280,15 +280,15 @@ function useDecryptToUI() {
       const kRaw = bigintToKey16(sk);
       const K = await aesImportRaw16(kRaw);
 
-      const plaintext = await decryptUtf8AesGcmPacked(
+      const plaintext = await decryptAesGcmPackedDual(
         res.payload as `0x${string}`,
         K
       );
 
       console.log("Decrypted! {plaintext}");
       setMessage("Done");
-      setRetrievedPayloadUtf8(plaintext);
-      setRetrievedPayloadHex(plaintext);
+      setRetrievedPayloadUtf8(plaintext.utf8);
+      setRetrievedPayloadHex(plaintext.hex);
     } catch (e: unknown) {
       const reason = extractRevertReason(e);
       setMessage(`local decryption failed: ${reason}`);
@@ -543,7 +543,6 @@ export const useFarewell = (parameters: {
         setMessage(`local decryption failed: ${reason}`);
         setRetrievedRecipientEmail(`(decrypt failed: ${reason})`);
         setRetrievedPayloadUtf8(reason);
-        setRetrievedPayloadHex(reason);
       }
     },
     [farewell.address, farewell.abi, ethersReadonlyProvider, ethersSigner]

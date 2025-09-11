@@ -114,22 +114,22 @@ function toArrayBuffer(v: ArrayBuffer | ArrayBufferView): ArrayBuffer {
  * packed = hex string of: IV(12 bytes) || CIPHERTEXT||TAG(16 bytes tag by default)
  * If you used AAD in encryption, pass the same bytes in `aad`.
  */
-export async function decryptUtf8AesGcmPacked(
+export async function decryptAesGcmPackedDual(
   packed: string,
   key: CryptoKey,
   aad?: Uint8Array,
   tagLengthBits = 128
-): Promise<string> {
+): Promise<{ utf8: string; hex: `0x${string}` }> {
   try {
     const data = hexToBytes(packed);
-    if (data.length < 12 + tagLengthBits / 8) {
+    const minLen = 12 + tagLengthBits / 8;
+    if (data.length < minLen) {
       throw new Error("cipher too short (missing IV or tag)");
     }
 
     const ivBytes = data.slice(0, 12);
     const ctAndTagBytes = data.slice(12);
 
-    // ★ Normalize to ArrayBuffer to satisfy AesGcmParams / BufferSource
     const ivAB = toArrayBuffer(ivBytes);
     const ctAndTagAB = toArrayBuffer(ctAndTagBytes);
     const aadAB = aad ? toArrayBuffer(aad) : undefined;
@@ -141,8 +141,13 @@ export async function decryptUtf8AesGcmPacked(
       ...(aadAB ? { additionalData: aadAB } : {}),
     };
 
-    const pt = await crypto.subtle.decrypt(alg, key, ctAndTagAB);
-    return new TextDecoder().decode(new Uint8Array(pt));
+    const ptAB = await crypto.subtle.decrypt(alg, key, ctAndTagAB);
+    const ptBytes = new Uint8Array(ptAB);
+
+    const utf8 = new TextDecoder().decode(ptBytes);
+    const hex = bytesToHex(ptBytes);
+
+    return { utf8, hex };
   } catch (err: unknown) {
     const e = err as DOMException & { name?: string; message?: string };
     console.error("[AES-GCM decrypt] failed:", e?.name || e, e);
@@ -153,6 +158,7 @@ export async function decryptUtf8AesGcmPacked(
     );
   }
 }
+
 
 /**
  * Convert a 16-byte key to a 128-bit BigInt (big-endian).
