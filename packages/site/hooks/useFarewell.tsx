@@ -40,7 +40,6 @@ export type DeliveryPackage = {
 };
 
 type FarewellInfoType = {
-  contractAddress: `0x${string}`;
   abi: typeof FarewellABI.abi;
   address?: `0x${string}`;
   chainId?: number;
@@ -81,16 +80,35 @@ function packEmailTo256Limbs(emailUtf8: string) {
 }
 
 function extractRevertReason(e: unknown): string {
-  const err = e as Record<string, any>;
+  // Safe getter that walks a dotted path, returning undefined if any level is missing
+  const get = (obj: unknown, path: string): unknown => {
+    let cur: unknown = obj;
+    for (const key of path.split(".")) {
+      if (
+        cur &&
+        typeof cur === "object" &&
+        key in (cur as Record<string, unknown>)
+      ) {
+        cur = (cur as Record<string, unknown>)[key];
+      } else {
+        return undefined;
+      }
+    }
+    return cur;
+  };
 
-  // Try ethers v6 shapes first
+  const asString = (v: unknown): string | undefined =>
+    typeof v === "string" ? v : undefined;
+
+  // Try ethers v6 and common provider shapes
   const candidates: Array<string | undefined> = [
-    err?.shortMessage, // ethers v6 cleaned message
-    err?.reason, // some libs/providers
-    err?.error?.message, // nested provider
-    err?.info?.error?.message, // Alchemy style
-    err?.data?.message, // generic nested data
-    typeof err?.message === "string" ? err.message : undefined,
+    asString(get(e, "shortMessage")), // ethers v6 cleaned message
+    asString(get(e, "reason")), // some libs/providers
+    asString(get(e, "error.message")), // nested provider
+    asString(get(e, "info.error.message")), // Alchemy style
+    asString(get(e, "data.message")), // generic nested data
+    e instanceof Error ? e.message : undefined, // native Error
+    asString(get(e, "message")), // plain object with message
   ];
 
   const clean = (s: string) =>
@@ -101,7 +119,14 @@ function extractRevertReason(e: unknown): string {
       .trim();
 
   const found = candidates.find((v) => typeof v === "string" && v.length > 0);
-  return found ? clean(found) : "Unknown error";
+  if (found) return clean(found);
+
+  // Last resort: stringify unknown error
+  try {
+    return clean(JSON.stringify(e));
+  } catch {
+    return "Unknown error";
+  }
 }
 
 function useDecryptToUI() {
@@ -325,7 +350,7 @@ export const useFarewell = (parameters: {
     farewellRef.current = c;
     if (!c.address) {
       setMessage(`Farewell deployment not found for chainId=${chainId}.`);
-    }else{
+    } else {
       setMessage(`Connected to Farewell on ${c.chainName} (${c.chainId}).`);
     }
     return c;
@@ -440,6 +465,10 @@ export const useFarewell = (parameters: {
         const result = (await contract.messageCount(target)) as bigint;
         setMessage(``);
         return result;
+      } catch (e: unknown) {
+        const reason = extractRevertReason(e);
+        setMessage(`messageCount() failed: ${reason}`);
+        throw e;
       } finally {
         setIsBusy(false);
       }
@@ -512,7 +541,7 @@ export const useFarewell = (parameters: {
       } catch (e: unknown) {
         const reason = extractRevertReason(e);
         setMessage(`local decryption failed: ${reason}`);
-      setRetrievedRecipientEmail(`(decrypt failed: ${reason})`);
+        setRetrievedRecipientEmail(`(decrypt failed: ${reason})`);
         setRetrievedPayloadUtf8(reason);
         setRetrievedPayloadHex(reason);
       }
@@ -596,13 +625,8 @@ export const useFarewell = (parameters: {
         if (isStale()) return;
         setMessage("register(checkIn,grace) completed.");
       } catch (e: unknown) {
-        const raw =
-          e instanceof Error
-            ? e?.message
-            : typeof e === "string"
-              ? e
-              : JSON.stringify(e);
-        setMessage(`register(checkIn,grace) failed: ${raw}`);
+        const reason = extractRevertReason(e);
+        setMessage(`register(checkIn,grace) failed: ${reason}`);
       } finally {
         setIsBusy(false);
       }
@@ -631,8 +655,7 @@ export const useFarewell = (parameters: {
       !sameSigner.current(thisSigner);
 
     setIsBusy(true);
-    setMessage("Start ping()...");
-
+    setMessage("Starting ping()...");
     try {
       const c = new ethers.Contract(thisAddr, farewell.abi, thisSigner);
       const tx = await c.ping();
@@ -641,13 +664,8 @@ export const useFarewell = (parameters: {
       if (isStale()) return;
       setMessage("ping() completed.");
     } catch (e: unknown) {
-      const raw =
-        e instanceof Error
-          ? e.message
-          : typeof e === "string"
-            ? e
-            : JSON.stringify(e);
-      setMessage(`ping() failed: ${raw}`);
+      const reason = extractRevertReason(e);
+      setMessage(`ping() failed: ${reason}`);
     } finally {
       setIsBusy(false);
     }
@@ -795,16 +813,11 @@ export const useFarewell = (parameters: {
 
         setMessage(
           `addMessage confirmed in block ${receipt.blockNumber}. View on Etherscan: https://sepolia.etherscan.io/tx/${txHash}`
-        ); // removed stray ')'
+        );
         return { txHash, receipt };
       } catch (e: unknown) {
-        const raw =
-          e instanceof Error
-            ? e.message
-            : typeof e === "string"
-              ? e
-              : JSON.stringify(e);
-        setMessage(`addMessage failed: ${raw}`);
+        const reason = extractRevertReason(e);
+        setMessage(`addMessage failed: ${reason}`);
         throw e;
       } finally {
         setIsBusy(false);
@@ -843,13 +856,8 @@ export const useFarewell = (parameters: {
         await tx.wait();
         if (isStale()) return;
       } catch (e: unknown) {
-        const raw =
-          e instanceof Error
-            ? e.message
-            : typeof e === "string"
-              ? e
-              : JSON.stringify(e);
-        setMessage(`markDeceased() failed: ${raw}`);
+        const reason = extractRevertReason(e);
+        setMessage(`markDeceased() failed: ${reason}`);
       } finally {
         setIsBusy(false);
       }
@@ -882,13 +890,8 @@ export const useFarewell = (parameters: {
         if (isStale()) return;
         setMessage("claim() completed.");
       } catch (e: unknown) {
-        const raw =
-          e instanceof Error
-            ? e.message
-            : typeof e === "string"
-              ? e
-              : JSON.stringify(e);
-        setMessage(`claim() failed: ${raw}`);
+        const reason = extractRevertReason(e);
+        setMessage(`claim() failed: ${reason}`);
       } finally {
         setIsBusy(false);
       }

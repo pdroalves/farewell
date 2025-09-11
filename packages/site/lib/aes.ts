@@ -35,16 +35,6 @@ export async function aes128Gen(): Promise<CryptoKey> {
   );
 }
 
-/**
- * Export an AES-GCM CryptoKey to raw 16-byte material.
- * Throws if the exported length is not 16 bytes (sanity check).
- */
-export async function aesExportRaw16(key: CryptoKey): Promise<Uint8Array> {
-  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", key));
-  if (raw.length !== 16) throw new Error("Exported key not 16 bytes");
-  return raw;
-}
-
 // Convert ArrayBuffer -> hex string
 function bufToHex(buf: ArrayBuffer): string {
   return Array.prototype.map
@@ -68,7 +58,6 @@ export async function printKeyHex(key: CryptoKey): Promise<void> {
  * - The returned hex is ideal for storing directly in `bytes payload` on-chain.
  */
 export async function encryptUtf8AesGcmPacked(s: string, key: CryptoKey): Promise<AesPacked> {
-  await printKeyHex(key);
   const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV (GCM best practice)
   const pt = new TextEncoder().encode(s);
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, pt));

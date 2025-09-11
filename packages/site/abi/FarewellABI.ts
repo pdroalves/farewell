@@ -255,6 +255,37 @@ export const FarewellABI = {
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "checkInPeriod",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "gracePeriod",
+          "type": "uint64"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint64",
+          "name": "registeredOn",
+          "type": "uint64"
+        }
+      ],
+      "name": "UserUpdated",
+      "type": "event"
+    },
+    {
       "inputs": [],
       "name": "UPGRADE_INTERFACE_VERSION",
       "outputs": [
