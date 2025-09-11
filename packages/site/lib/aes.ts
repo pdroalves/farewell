@@ -112,6 +112,14 @@ export async function aesImportRaw16(raw: Uint8Array | ArrayBuffer): Promise<Cry
   );
 }
 
+// Normalize any view/buffer to a *real* ArrayBuffer (not ArrayBufferLike/SharedArrayBuffer)
+function toArrayBuffer(v: ArrayBuffer | ArrayBufferView): ArrayBuffer {
+  if (v instanceof ArrayBuffer) return v;
+  const ab = new ArrayBuffer(v.byteLength);
+  new Uint8Array(ab).set(new Uint8Array(v.buffer, v.byteOffset, v.byteLength));
+  return ab;
+}
+
 
 /**
  * packed = hex string of: IV(12 bytes) || CIPHERTEXT||TAG(16 bytes tag by default)
@@ -120,35 +128,35 @@ export async function aesImportRaw16(raw: Uint8Array | ArrayBuffer): Promise<Cry
 export async function decryptUtf8AesGcmPacked(
   packed: string,
   key: CryptoKey,
-  aad?: Uint8Array,              // pass same AAD you used on encrypt, if any
-  tagLengthBits: number = 128    // match encrypt’s tagLength if you changed it
+  aad?: Uint8Array,
+  tagLengthBits = 128
 ): Promise<string> {
   try {
-    console.log("AES-GCM decrypt:", packed);
-  // await printKeyHex(key);
-
     const data = hexToBytes(packed);
-    // Need at least 12 (IV) + 16 (tag)
     if (data.length < 12 + tagLengthBits / 8) {
       throw new Error("cipher too short (missing IV or tag)");
     }
-    const iv = data.slice(0, 12);
-    const ctAndTag = data.slice(12); // WebCrypto expects tag appended here
+
+    const ivBytes = data.slice(0, 12);
+    const ctAndTagBytes = data.slice(12);
+
+    // ★ Normalize to ArrayBuffer to satisfy AesGcmParams / BufferSource
+    const ivAB = toArrayBuffer(ivBytes);
+    const ctAndTagAB = toArrayBuffer(ctAndTagBytes);
+    const aadAB = aad ? toArrayBuffer(aad) : undefined;
 
     const alg: AesGcmParams = {
       name: "AES-GCM",
-      iv,
+      iv: ivAB,
       tagLength: tagLengthBits,
-      ...(aad ? { additionalData: aad } : {})
+      ...(aadAB ? { additionalData: aadAB } : {}),
     };
 
-    const pt = await crypto.subtle.decrypt(alg, key, ctAndTag);
+    const pt = await crypto.subtle.decrypt(alg, key, ctAndTagAB);
     return new TextDecoder().decode(new Uint8Array(pt));
   } catch (err: unknown) {
-    // DOMException often has empty message — log name & details
     const e = err as DOMException & { name?: string; message?: string };
     console.error("[AES-GCM decrypt] failed:", e?.name || e, e);
-    // Surface something human-friendly:
     throw new Error(
       e?.name
         ? `AES-GCM decrypt failed: ${e.name} (likely key/IV/tag/AAD mismatch)`
@@ -156,7 +164,6 @@ export async function decryptUtf8AesGcmPacked(
     );
   }
 }
-
 
 /**
  * Convert a 16-byte key to a 128-bit BigInt (big-endian).
