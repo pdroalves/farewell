@@ -6,6 +6,7 @@ import { useFhevm } from "@/fhevm/useFhevm";
 import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSigner";
 import { useFarewell } from "@/hooks/useFarewell";
 import { ethers } from "ethers";
+import TopBar from "@/components/TopBar";
 
 import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
 
@@ -19,7 +20,9 @@ function SectionHeader({
 }) {
   return (
     <div className="mb-2">
-      <h2 className="text-lg sm:text-xl font-semibold text-slate-800">{title}</h2>
+      <h2 className="text-lg sm:text-xl font-semibold text-slate-800">
+        {title}
+      </h2>
       {subtitle && (
         <p className="text-xs sm:text-sm text-slate-600 mt-1">{subtitle}</p>
       )}
@@ -69,7 +72,7 @@ export default function Farewell() {
   const {
     instance: fhevmInstance,
     status: fhevmStatus,
-    error: fhevmError,
+    // error: fhevmError,
   } = useFhevm({
     provider,
     chainId,
@@ -88,8 +91,10 @@ export default function Farewell() {
     sameSigner,
   });
 
+  const isRegLoading = farewell.isRegistered === undefined;
+
   // form state
-  const [showDetails, setShowDetails] = useState(false); // hide chain/status cards by default
+  // const [showDetails, setShowDetails] = useState(false); // hide chain/status cards by default
 
   const [email, setEmail] = useState("");
   const [payload, setPayload] = useState<string>("");
@@ -112,6 +117,8 @@ export default function Farewell() {
   // AES secret key
   const [sHex, setSHex] = useState<`0x${string}`>("0x");
   const [sPrimeHex, setSPrimeHex] = useState<`0x${string}`>("0x");
+
+  const [pingBusy, setPingBusy] = useState(false);
 
   // Randomizers
   function handleRandSPrime() {
@@ -168,7 +175,7 @@ export default function Farewell() {
     "rounded-2xl border border-slate-200 bg-slate-50/80 backdrop-blur-sm shadow-sm p-4 sm:p-5";
   const sectionClass =
     "rounded-2xl border border-slate-200 bg-white shadow-sm p-4 sm:p-5 space-y-3";
-  const titleClass = "font-semibold text-slate-800 text-base sm:text-lg";
+  // const titleClass = "font-semibold text-slate-800 text-base sm:text-lg";
   const inputClass =
     "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder-slate-400 " +
     "focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500";
@@ -177,18 +184,19 @@ export default function Farewell() {
   const labelClass = "text-xs sm:text-sm font-medium text-slate-600 mb-1";
   const btnBase =
     "inline-flex items-center justify-center rounded-xl px-4 py-2 text-center transition";
-  const btnPrimary =
-    `${btnBase} bg-sky-600 font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500`;
-  const btnSecondary =
-    `${btnBase} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300`;
+  const btnPrimary = `${btnBase} bg-sky-600 font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500`;
+  const btnSecondary = `${btnBase} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-300`;
 
   if (!isConnected) {
     return (
       <div className="mx-auto max-w-md p-4 sm:p-8">
         <div className={cardClass + " text-center space-y-3"}>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Connect your wallet</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">
+            Connect your wallet
+          </h1>
           <p className="text-xs sm:text-sm text-slate-600">
-            Farewell uses your wallet to sign and send transactions to the chain. We do not custody your keys.
+            Farewell uses your wallet to sign and send transactions to the
+            chain. We do not custody your keys.
           </p>
           <button className={btnPrimary + " w-full"} onClick={connect}>
             <span className="text-base">Connect to MetaMask</span>
@@ -203,10 +211,13 @@ export default function Farewell() {
       <div className="mx-auto max-w-3xl p-4 sm:p-6">
         <div className={cardClass}>
           <p className="text-slate-800">
-            Farewell is not deployed on chain <span className="font-mono">{chainId}</span>.
+            Farewell is not deployed on chain{" "}
+            <span className="font-mono">{chainId}</span>.
           </p>
           <Callout>
-            The UI loads but the contract for this chain isn’t available. Switch networks in MetaMask (e.g., Sepolia or your Hardhat local node) to continue.
+            The UI loads but the contract for this chain isn’t available. Switch
+            networks in MetaMask (e.g., Sepolia or your Hardhat local node) to
+            continue.
           </Callout>
         </div>
       </div>
@@ -242,19 +253,46 @@ export default function Farewell() {
     friendlyName = "Charlie";
   }
 
+  const handlePing = async () => {
+    if (!farewell || !isConnected) return;
+    setPingBusy(true);
+    try {
+      farewell.ping();
+      try {
+        const n = await farewell.messageCount();
+        setLastCount(n.toString());
+      } catch {}
+    } finally {
+      setPingBusy(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <TopBar
+        address={
+          ethersSigner ? accounts?.[0] : "No signer" /* string | undefined */
+        }
+        chainName={farewell.chainName /* e.g., 'sepolia' */}
+        status={
+          fhevmReady ? "ready" : "error" /* 'ready' | 'connecting' | 'error' */
+        }
+        messageCount={Number(lastCount) /* number | null */}
+        message={farewell.message /* string | undefined */}
+        onPing={farewell.isRegistered ? handlePing : undefined} // only show if registered
+        pingBusy={pingBusy}
+      />
       {/* Toggle button */}
-      <div className="flex justify-end">
+      {/* <div className="flex justify-end">
         <button
           className={btnSecondary + " w-full sm:w-auto"}
           onClick={() => setShowDetails(!showDetails)}
         >
           {showDetails ? "Hide chain / status" : "Show chain / status"}
         </button>
-      </div>
+      </div> */}
 
-      {showDetails && (
+      {/* {showDetails && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <div className={cardClass + " lg:col-span-8"}>
@@ -289,7 +327,7 @@ export default function Farewell() {
             </div>
           </div>
         </>
-      )}
+      )} */}
 
       {friendlyName && (
         <div className="text-lg sm:text-xl font-semibold text-slate-800">
@@ -299,116 +337,99 @@ export default function Farewell() {
               {farewell.isRegistered === undefined
                 ? "(checking…)"
                 : farewell.isRegistered
-                ? "You are registered :-)"
-                : "You are not registered :-("}
+                  ? "You are registered :-)"
+                  : "You are not registered :-("}
             </span>
           )}
         </div>
       )}
 
-      {farewell.message && (
-        <div className={cardClass}>
-          <p className="text-sm text-slate-700">{farewell.message}</p>
-        </div>
-      )}
-
-      {/* Register / Ping */}
-      <section className={sectionClass}>
-        <SectionHeader
-          title="Register / Ping"
-          subtitle="Register on Farewell and define your check-in cadence. As long as you remain active (by pinging periodically), your messages stay sealed. Once both the check-in and grace periods expire, your messages become claimable. If you’re already registered, this will update your settings."
-        />
-        <Callout>
-          <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
-            <li>
-              <strong>Register</strong> writes your settings on‑chain (new or updated).
-            </li>
-            <li>
-              <strong>Ping</strong> refreshes your <em>lastCheckIn</em> timestamp. No other data changes.
-            </li>
-          </ul>
-        </Callout>
-
-        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 mt-2">
-          <div className="flex flex-col sm:w-auto w-full">
-            <label className={labelClass}>Check‑in (days)</label>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              className={inputClass + " w-full sm:w-36"}
-              value={checkInDays}
-              onChange={(e) => setCheckInDays(e.target.value)}
+      {/* Register (only when NOT registered) */}
+      {!farewell.isRegistered &&
+        (console.log(
+          "Rendering register section because isRegistered is",
+          farewell.isRegistered
+        ), // DEBUG
+        (
+          <section className={sectionClass}>
+            <SectionHeader
+              title="Register"
+              subtitle="Register on Farewell and define your check-in cadence."
             />
-          </div>
 
-          <div className="flex flex-col sm:w-auto w-full">
-            <label className={labelClass}>Grace (days)</label>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              className={inputClass + " w-full sm:w-36"}
-              value={graceDays}
-              onChange={(e) => setGraceDays(e.target.value)}
-            />
-          </div>
+            <Callout>
+              <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+                <li>
+                  <strong>Register</strong> writes your settings on-chain (new
+                  or updated).
+                </li>
+              </ul>
+            </Callout>
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-1">
-            <button
-              disabled={farewell.isBusy || !isConnected}
-              onClick={() => {
-                const dToSec = (d: string) =>
-                  BigInt(Math.max(0, Number(d || 0))) * BigInt(24 * 60 * 60);
-                const checkInSec = dToSec(checkInDays);
-                const graceSec = dToSec(graceDays);
-                farewell
-                  .registerWithParams(checkInSec, graceSec)
-                  .catch((e) => alert(String(e?.message ?? e)));
-              }}
-              className={btnPrimary + " w-full sm:w-auto"}
-            >
-              register
-            </button>
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 mt-2">
+              <div className="flex flex-col sm:w-auto w-full">
+                <label className={labelClass}>Check-in (days)</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className={inputClass + " w-full sm:w-36"}
+                  value={checkInDays}
+                  onChange={(e) => setCheckInDays(e.target.value)}
+                />
+              </div>
 
-            <button
-              disabled={farewell.isBusy || !isConnected}
-              onClick={() => farewell.ping().catch(() => {})}
-              className={btnSecondary + " w-full sm:w-auto"}
-            >
-              ping()
-            </button>
-          </div>
-        </div>
+              <div className="flex flex-col sm:w-auto w-full">
+                <label className={labelClass}>Grace (days)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  className={inputClass + " w-full sm:w-36"}
+                  value={graceDays}
+                  onChange={(e) => setGraceDays(e.target.value)}
+                />
+              </div>
 
-        <SectionHeader
-          title="Message Count"
-          subtitle="Query how many messages you’ve added so far (stored under your address)."
-        />
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <button
-            disabled={farewell.isBusy || !fhevmReady}
-            onClick={() =>
-              farewell
-                .messageCount()
-                .then((n) => setLastCount(n.toString()))
-                .catch(() => {})
-            }
-            className={btnPrimary + " w-full sm:w-auto"}
-          >
-            Count
-          </button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-1">
+                <button
+                  disabled={farewell.isBusy || !isConnected}
+                  onClick={() => {
+                    const dToSec = (d: string) =>
+                      BigInt(Math.max(0, Number(d || 0))) *
+                      BigInt(24 * 60 * 60);
+                    const checkInSec = dToSec(checkInDays);
+                    const graceSec = dToSec(graceDays);
+                    farewell
+                      .registerWithParams(checkInSec, graceSec)
+                      // OPTIONAL: refresh lastCount after register:
+                      .then(() =>
+                        farewell
+                          .messageCount()
+                          .then((n) => setLastCount(n.toString()))
+                          .catch(() => {})
+                      )
+                      .catch((e) => alert(String(e?.message ?? e)));
+                  }}
+                  className={btnPrimary + " w-full sm:w-auto"}
+                >
+                  register
+                </button>
+              </div>
+            </div>
+          </section>
+        ))}
 
-          <input
-            className={inputReadonlyClass + " sm:w-40"}
-            value={lastCount || ""}
-            onChange={() => {}}
-            readOnly
-            placeholder="—"
-            aria-label="messageCount result"
+      {/* (Optional) Small loading card while we check registration */}
+      {isRegLoading && (
+        <section className={sectionClass}>
+          <SectionHeader
+            title="Loading"
+            subtitle="Checking your registration status…"
           />
-        </div>
-      </section>
+          <p className="text-sm text-slate-700">Please wait…</p>
+        </section>
+      )}
 
       {/* Set cryptographic keys */}
       <section className={sectionClass}>
@@ -419,13 +440,16 @@ export default function Farewell() {
         <Callout title="Under the hood">
           <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
             <li>
-              <code>s</code> is encrypted and stored through the fhEVM flow; only authorized readers can decrypt it after <em>claim</em>.
+              <code>s</code> is encrypted and stored through the fhEVM flow;
+              only authorized readers can decrypt it after <em>claim</em>.
             </li>
             <li>
-              <code>s′</code> never touches the chain. You must deliver it out‑of‑band to the recipient.
+              <code>s′</code> never touches the chain. You must deliver it
+              out‑of‑band to the recipient.
             </li>
             <li>
-              When retrieving, the app recombines <code>sk = s ⊕ s′</code> client‑side to decrypt the payload.
+              When retrieving, the app recombines <code>sk = s ⊕ s′</code>{" "}
+              client‑side to decrypt the payload.
             </li>
           </ul>
         </Callout>
@@ -433,29 +457,38 @@ export default function Farewell() {
         <Callout title="Choosing s and s′" variant="danger">
           <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
             <li>
-              You can choose not to set <code>s′</code>. In this case you don′t have to share anything with the recipient. On the other hand, this means that whoever retrieve the message will be able to decrypt it, since <code>sk = s</code> .
+              You can choose not to set <code>s′</code>. In this case you don′t
+              have to share anything with the recipient. On the other hand, this
+              means that whoever retrieve the message will be able to decrypt
+              it, since <code>sk = s</code> .
             </li>
             <li>
-              You may choose not to set <code>s</code>, but this is <b>not recommended</b>. In that case, the recipient, who receives <code>s′</code>, would possess the entire secret key. Because the encrypted message is stored publicly on-chain, the recipient could retrieve and decrypt it prematurely.
+              You may choose not to set <code>s</code>, but this is{" "}
+              <b>not recommended</b>. In that case, the recipient, who receives{" "}
+              <code>s′</code>, would possess the entire secret key. Because the
+              encrypted message is stored publicly on-chain, the recipient could
+              retrieve and decrypt it prematurely.
             </li>
           </ul>
         </Callout>
 
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3">
-          <div className="flex flex-col sm:w-auto w-full">
-            <label className={labelClass}>s (hex)</label>
-            <input
-              className={inputClass}
-              placeholder="0x… (32 hex bytes)"
-              value={sHex}
-              onChange={handleSChange}
-              onPaste={(e) => handlePasteClamp(e, setSHex)}
-              maxLength={66}
-              inputMode="text"
-              pattern="0x[0-9a-fA-F]*"
-              spellCheck={false}
-            />
-          </div>
+          {farewell.isRegistered && (
+            <div className="flex flex-col sm:w-auto w-full">
+              <label className={labelClass}>s (hex)</label>
+              <input
+                className={inputClass}
+                placeholder="0x… (32 hex bytes)"
+                value={sHex}
+                onChange={handleSChange}
+                onPaste={(e) => handlePasteClamp(e, setSHex)}
+                maxLength={66}
+                inputMode="text"
+                pattern="0x[0-9a-fA-F]*"
+                spellCheck={false}
+              />
+            </div>
+          )}
 
           <div className="flex flex-col sm:w-auto w-full">
             <label className={labelClass}>s′ (hex)</label>
@@ -472,23 +505,37 @@ export default function Farewell() {
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <button
-              disabled={farewell.isBusy || !isConnected}
-              onClick={handleRandS}
-              className={btnPrimary + " w-full sm:w-auto"}
-            >
-              randomize s
-            </button>
+          {farewell.isRegistered && (
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <button
+                disabled={farewell.isBusy || !isConnected}
+                onClick={handleRandS}
+                className={btnPrimary + " w-full sm:w-auto"}
+              >
+                randomize s
+              </button>
 
-            <button
-              disabled={farewell.isBusy || !isConnected}
-              onClick={handleRandSPrime}
-              className={btnSecondary + " w-full sm:w-auto"}
-            >
-              randomize s′
-            </button>
-          </div>
+              <button
+                disabled={farewell.isBusy || !isConnected}
+                onClick={handleRandSPrime}
+                className={btnSecondary + " w-full sm:w-auto"}
+              >
+                randomize s′
+              </button>
+            </div>
+          )}
+
+          {!farewell.isRegistered && (
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <button
+                disabled={farewell.isBusy || !isConnected}
+                onClick={handleRandSPrime}
+                className={btnSecondary + " w-full sm:w-auto"}
+              >
+                randomize s′
+              </button>
+            </div>
+          )}
           <div className="text-[10px] sm:text-xs text-slate-500">
             sk = s ⊕ s′ = <span className="font-mono">{xorHex}</span>
           </div>
@@ -496,68 +543,82 @@ export default function Farewell() {
       </section>
 
       {/* Add Message */}
-      <section className={sectionClass}>
-        <SectionHeader
-          title="Add Message"
-          subtitle="Store an encrypted payload and the recipient’s email metadata on‑chain. You choose whether the payload is a hex blob (0x…) or plain UTF‑8 text (we’ll convert)."
-        />
-        <Callout title="What happens on click?">
-          <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
-            <li>We encrypt the on‑chain <em>Message</em> using your inputs.</li>
-            <li>
-              <code>s</code> and the recipient address are handled through FHE permissions so only the rightful claimer can decrypt later.
-            </li>
-            <li>The transaction is sent with your wallet. Gas costs apply.</li>
-          </ul>
-        </Callout>
-        <div className="grid gap-3 mt-2">
-          <input
-            className={inputClass}
-            placeholder="recipient email (UTF‑8)"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+      {farewell.isRegistered && (
+        <section className={sectionClass}>
+          <SectionHeader
+            title="Add Message"
+            subtitle="Store an encrypted payload and the recipient’s email metadata on‑chain. You choose whether the payload is a hex blob (0x…) or plain UTF‑8 text (we’ll convert)."
           />
-          <textarea
-            className={inputClass + " min-h-[100px]"}
-            placeholder="payload (string or 0x...)"
-            value={payload}
-            onChange={(e) => setPayload(e.target.value)}
-          />
-          <input
-            className={inputClass}
-            placeholder="publicMessage (optional)"
-            value={publicMessage}
-            onChange={(e) => setPublicMessage(e.target.value)}
-          />
+          <Callout title="What happens on click?">
+            <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
+              <li>
+                We encrypt the on‑chain <em>Message</em> using your inputs.
+              </li>
+              <li>
+                <code>s</code> and the recipient address are handled through FHE
+                permissions so only the rightful claimer can decrypt later.
+              </li>
+              <li>
+                The transaction is sent with your wallet. Gas costs apply.
+              </li>
+            </ul>
+          </Callout>
+          <div className="grid gap-3 mt-2">
+            <input
+              className={inputClass}
+              placeholder="recipient email (UTF‑8)"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <textarea
+              className={inputClass + " min-h-[100px]"}
+              placeholder="payload (string or 0x...)"
+              value={payload}
+              onChange={(e) => setPayload(e.target.value)}
+            />
+            <input
+              className={inputClass}
+              placeholder="publicMessage (optional)"
+              value={publicMessage}
+              onChange={(e) => setPublicMessage(e.target.value)}
+            />
 
-          <div className="flex flex-col sm:flex-row justify-end gap-2">
-            <button
-              disabled={farewell.isBusy || !fhevmReady}
-              onClick={() =>
-                (async () => {
-                  const payloadValue = isHex(payload)
-                    ? (payload as `0x${string}`)
-                    : payload;
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <button
+                disabled={farewell.isBusy || !fhevmReady}
+                onClick={() =>
+                  (async () => {
+                    const payloadValue = isHex(payload)
+                      ? (payload as `0x${string}`)
+                      : payload;
 
-                  await farewell.addMessage(
-                    email,
-                    payloadValue,
-                    sHex,
-                    sPrimeHex,
-                    publicMessage.trim() ? publicMessage : undefined
-                  );
-                })().catch((e) =>
-                  alert(`Add Message failed:\n${String(e?.message ?? e)}`)
-                )
-              }
-              className={btnPrimary + " w-full sm:w-auto"}
-            >
-              Add Message
-            </button>
+                    await farewell.addMessage(
+                      email,
+                      payloadValue,
+                      sHex,
+                      sPrimeHex,
+                      publicMessage.trim() ? publicMessage : undefined
+                    );
+
+                    const n = await farewell.messageCount();
+                    setLastCount(n.toString());
+
+                    // Reset message form
+                    setPublicMessage("");
+                    setPayload("");
+                    setEmail("");
+                  })().catch((e) =>
+                    alert(`Add Message failed:\n${String(e?.message ?? e)}`)
+                  )
+                }
+                className={btnPrimary + " w-full sm:w-auto"}
+              >
+                Add Message
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
-
+        </section>
+      )}
       {/* Mark Deceased */}
       <section className={sectionClass}>
         <SectionHeader
@@ -565,7 +626,8 @@ export default function Farewell() {
           subtitle="Anyone can call this after a user’s check‑in + grace have both elapsed. It flips the on‑chain flag that allows a message to be claimed."
         />
         <Callout>
-          Try to mark an address as deceased. The contract will revert if the timing conditions are not met.
+          Try to mark an address as deceased. The contract will revert if the
+          timing conditions are not met.
         </Callout>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto] items-end mt-2">
@@ -575,7 +637,9 @@ export default function Farewell() {
               className={inputClass + " font-mono"}
               placeholder={accounts?.[0] ?? "0x0000…"}
               value={deceasedTarget}
-              onChange={(e) => setDeceasedTarget(e.target.value as `0x${string}`)}
+              onChange={(e) =>
+                setDeceasedTarget(e.target.value as `0x${string}`)
+              }
             />
           </div>
 
@@ -600,7 +664,10 @@ export default function Farewell() {
           subtitle="The intended recipient (or notifier) calls this to gain permission to read the FHE‑protected fields (email limbs and skShare)."
         />
         <Callout title="Under the hood">
-          The contract grants FHE read permissions to the claimer, which is known as the <em>notifier</em>. For 24 hours, only the <em>notifier</em> may claim; afterwards, it becomes available to anyone.
+          The contract grants FHE read permissions to the claimer, which is
+          known as the <em>notifier</em>. For 24 hours, only the{" "}
+          <em>notifier</em> may claim; afterwards, it becomes available to
+          anyone.
         </Callout>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end mt-2">
@@ -627,7 +694,8 @@ export default function Farewell() {
           <button
             disabled={farewell.isBusy || !isConnected}
             onClick={() => {
-              const owner = (claimOwner || (accounts?.[0] as `0x${string}`)) as `0x${string}`;
+              const owner = (claimOwner ||
+                (accounts?.[0] as `0x${string}`)) as `0x${string}`;
               if (!owner) {
                 alert("Provide an owner address or connect your wallet");
                 return;
@@ -652,7 +720,8 @@ export default function Farewell() {
           subtitle="Fetch the message data. If you’re authorized and FHE is ready, the UI will decrypt the email and skShare client‑side; then it uses skShare as s to reconstruct sk and decrypt your payload."
         />
         <Callout variant="warning" title="Important">
-          Make sure you’ve set <code>s′</code> above before retrieving; otherwise recombining <code>sk</code> will be impossible.
+          Make sure you’ve set <code>s′</code> above before retrieving;
+          otherwise recombining <code>sk</code> will be impossible.
         </Callout>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end mt-2">
@@ -662,7 +731,9 @@ export default function Farewell() {
               className={inputClass + " font-mono"}
               placeholder={accounts?.[0] ?? "0x0000…"}
               value={retrieveOwner}
-              onChange={(e) => setRetrieveOwner(e.target.value as `0x${string}`)}
+              onChange={(e) =>
+                setRetrieveOwner(e.target.value as `0x${string}`)
+              }
             />
           </div>
 
@@ -680,7 +751,8 @@ export default function Farewell() {
             disabled={farewell.isBusy || !isConnected}
             onClick={() =>
               (async () => {
-                const owner = (retrieveOwner || (accounts?.[0] as `0x${string}`)) as `0x${string}`;
+                const owner = (retrieveOwner ||
+                  (accounts?.[0] as `0x${string}`)) as `0x${string}`;
                 if (!owner) {
                   alert("Provide an owner address or connect your wallet");
                   return;
@@ -755,7 +827,9 @@ export default function Farewell() {
           <div className="flex flex-col">
             <label className={labelClass}>payload (hex)</label>
             <textarea
-              className={inputReadonlyClass + " w-full min-h-[160px] font-mono resize-y"}
+              className={
+                inputReadonlyClass + " w-full min-h-[160px] font-mono resize-y"
+              }
               value={farewell.retrievedPayloadHex}
               readOnly
               placeholder="hidden message (as hex)"
@@ -775,52 +849,10 @@ export default function Farewell() {
       </section>
 
       {!farewell.isDeployed && (
-        <p className="text-xs sm:text-sm text-amber-600">Farewell is not deployed for the current chain.</p>
+        <p className="text-xs sm:text-sm text-amber-600">
+          Farewell is not deployed for the current chain.
+        </p>
       )}
     </div>
-  );
-}
-
-/* ——— Pretty property renderers ——— */
-
-function printProperty(name: string, value: unknown) {
-  let displayValue: string;
-
-  if (typeof value === "boolean") {
-    return printBooleanProperty(name, value);
-  } else if (typeof value === "string" || typeof value === "number") {
-    displayValue = String(value);
-  } else if (typeof value === "bigint") {
-    displayValue = String(value);
-  } else if (value === null) {
-    displayValue = "null";
-  } else if (value === undefined) {
-    displayValue = "undefined";
-  } else if (value instanceof Error) {
-    displayValue = value.message;
-  } else {
-    displayValue = JSON.stringify(value);
-  }
-
-  return (
-    <p className="text-slate-700 text-sm">
-      <span className="text-slate-500">{name}:</span>{" "}
-      <span className="font-mono font-semibold text-slate-900 break-all">{displayValue}</span>
-    </p>
-  );
-}
-
-function printBooleanProperty(name: string, value: boolean) {
-  return (
-    <p className="text-slate-700 text-sm">
-      <span className="text-slate-500">{name}:</span>{" "}
-      <span
-        className={
-          "font-mono font-semibold " + (value ? "text-green-600" : "text-rose-600")
-        }
-      >
-        {String(value)}
-      </span>
-    </p>
   );
 }

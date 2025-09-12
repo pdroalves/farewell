@@ -335,6 +335,7 @@ export const useFarewell = (parameters: {
   const [retrievedPayloadHex, setRetrievedPayloadHex] = useState("");
   const [retrievedPayloadUtf8, setRetrievedPayloadUtf8] = useState("");
   const [retrievedPubMsg, setRetrievedPubMsg] = useState("");
+  const [chainName, setChainName] = useState<string>("");
 
   useEffect(() => {
     isBusyRef.current = isBusy;
@@ -353,6 +354,7 @@ export const useFarewell = (parameters: {
     } else {
       setMessage(`Connected to Farewell on ${c.chainName} (${c.chainId}).`);
     }
+    setChainName(c.chainName ?? "Unknown network");
     return c;
   }, [chainId]);
 
@@ -487,6 +489,7 @@ export const useFarewell = (parameters: {
       if (!farewell.address) throw new Error("Contract address not ready");
 
       try {
+        setMessage("Starting retrieve()...");
         // Determine target owner and current caller
         const target = addressToRetrieve ?? (await ethersSigner?.getAddress());
         if (!target)
@@ -522,6 +525,7 @@ export const useFarewell = (parameters: {
           });
         }
 
+        setMessage("Data is here! Decrypting...");
         decryptToUI(
           fhevmInstance,
           farewell,
@@ -543,6 +547,8 @@ export const useFarewell = (parameters: {
         setMessage(`local decryption failed: ${reason}`);
         setRetrievedRecipientEmail(`(decrypt failed: ${reason})`);
         setRetrievedPayloadUtf8(reason);
+      }finally{ 
+        setMessage("");
       }
     },
     [farewell.address, farewell.abi, ethersReadonlyProvider, ethersSigner]
@@ -908,6 +914,7 @@ export const useFarewell = (parameters: {
   return {
     contractAddress: farewell.address,
     isDeployed,
+    chainName,
     // UX
     message,
     isBusy,
