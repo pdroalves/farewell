@@ -79,7 +79,7 @@ function packEmailTo256Limbs(emailUtf8: string) {
   return { limbs, byteLen: len };
 }
 
-function extractRevertReason(e: unknown): string {
+export function extractRevertReason(e: unknown): string {
   // Safe getter that walks a dotted path, returning undefined if any level is missing
   const get = (obj: unknown, path: string): unknown => {
     let cur: unknown = obj;
@@ -465,6 +465,142 @@ export const useFarewell = (parameters: {
         );
 
         const result = (await contract.messageCount(target)) as bigint;
+        setMessage(``);
+        return result;
+      } catch (e: unknown) {
+        const reason = extractRevertReason(e);
+        setMessage(`messageCount() failed: ${reason}`);
+        throw e;
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [farewell.address, farewell.abi, ethersReadonlyProvider]
+  );
+  const getDeceaseStatus = useCallback(
+    async (owner?: `0x${string}`) => {
+      if (!farewell.address || !ethersReadonlyProvider) {
+        throw new Error("Readonly provider or contract address not ready");
+      }
+      setIsBusy(true);
+      try {
+        // Default to the connected signer’s address if no owner was passed
+        let target: `0x${string}` | undefined = owner;
+        if (!target) {
+          if (!ethersSigner) {
+            throw new Error("Pass an owner address or connect your wallet");
+          }
+          const addr = (await ethersSigner.getAddress()) as `0x${string}`;
+          target = addr;
+        }
+
+        setMessage(`Querying for decease status for ${target}...`);
+
+        const contract = new ethers.Contract(
+          farewell.address,
+          farewell.abi,
+          ethersReadonlyProvider
+        );
+
+        const result = (await contract.getDeceasedStatus(target)) as bigint;
+        setMessage(``);
+        return result;
+      } catch (e: unknown) {
+        const reason = extractRevertReason(e);
+        setMessage(`messageCount() failed: ${reason}`);
+        throw e;
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [farewell.address, farewell.abi, ethersReadonlyProvider]
+  );
+
+  const getLastCheckin = useCallback(
+    async (owner?: `0x${string}`) => {
+      if (!farewell.address || !ethersReadonlyProvider) {
+        throw new Error("Readonly provider or contract address not ready");
+      }
+      setIsBusy(true);
+      try {
+        // Default to the connected signer’s address if no owner was passed
+        let target: `0x${string}` | undefined = owner;
+        if (!target) {
+          if (!ethersSigner) {
+            throw new Error("Pass an owner address or connect your wallet");
+          }
+          const addr = (await ethersSigner.getAddress()) as `0x${string}`;
+          target = addr;
+        }
+
+        setMessage(`Querying for last check-in for ${target}...`);
+
+        const contract = new ethers.Contract(
+          farewell.address,
+          farewell.abi,
+          ethersReadonlyProvider
+        );
+
+        const result = (await contract.getLastCheckIn(target)) as bigint;
+        setMessage(``);
+        return result;
+      } catch (e: unknown) {
+        const reason = extractRevertReason(e);
+        setMessage(`messageCount() failed: ${reason}`);
+        throw e;
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [farewell.address, farewell.abi, ethersReadonlyProvider]
+  );
+
+  const getNumberOfRegisteredUsers = useCallback(
+    async () => {
+      if (!farewell.address || !ethersReadonlyProvider) {
+        throw new Error("Readonly provider or contract address not ready");
+      }
+      setIsBusy(true);
+      try {
+
+        setMessage(`Querying for number of total registered users...`);
+
+        const contract = new ethers.Contract(
+          farewell.address,
+          farewell.abi,
+          ethersReadonlyProvider
+        );
+
+        const result = (await contract.getNumberOfRegisteredUsers()) as bigint;
+        setMessage(``);
+        return result;
+      } catch (e: unknown) {
+        const reason = extractRevertReason(e);
+        setMessage(`messageCount() failed: ${reason}`);
+        throw e;
+      } finally {
+        setIsBusy(false);
+      }
+    },
+    [farewell.address, farewell.abi, ethersReadonlyProvider]
+  );
+  const getNumberOfAddedMessages = useCallback(
+    async () => {
+      if (!farewell.address || !ethersReadonlyProvider) {
+        throw new Error("Readonly provider or contract address not ready");
+      }
+      setIsBusy(true);
+      try {
+
+        setMessage(`Querying for number of total registered users...`);
+
+        const contract = new ethers.Contract(
+          farewell.address,
+          farewell.abi,
+          ethersReadonlyProvider
+        );
+
+        const result = (await contract.getNumberOfAddedMessages()) as bigint;
         setMessage(``);
         return result;
       } catch (e: unknown) {
@@ -938,5 +1074,9 @@ export const useFarewell = (parameters: {
     retrieve,
     isRegistered,
     checkRegistration,
+    getNumberOfRegisteredUsers,
+    getNumberOfAddedMessages,
+    getLastCheckin,
+    getDeceaseStatus,
   };
 };

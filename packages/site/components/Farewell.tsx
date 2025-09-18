@@ -9,6 +9,7 @@ import { ethers } from "ethers";
 import TopBar from "@/components/TopBar";
 
 import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
+import { MyStatus, NetworkStats } from "@/components/StatsBlocks";
 
 // ——— Small UI helpers ————————————————————————————————————————————————
 function SectionHeader({
@@ -344,6 +345,12 @@ export default function Farewell() {
         </div>
       )}
 
+      {farewell.isRegistered && 
+        (
+    <MyStatus hook={farewell} />
+        )
+      }
+
       {/* Register (only when NOT registered) */}
       {!farewell.isRegistered &&
         (console.log(
@@ -360,8 +367,10 @@ export default function Farewell() {
             <Callout>
               <ul className="list-disc pl-5 space-y-1 text-xs sm:text-sm">
                 <li>
-                  <strong>Register</strong> writes your settings on-chain (new
-                  or updated).
+                  <strong>Check-in:</strong> number of days before Farewell considers that you have passed away.
+                </li>
+                <li>
+                  <strong>Grace:</strong> number of days additional days, after the end of the check-in period, which Farewell will accept actions to prevent message release.
                 </li>
               </ul>
             </Callout>
@@ -848,6 +857,8 @@ export default function Farewell() {
         </div>
       </section>
 
+    <NetworkStats hook={farewell} />
+
       {!farewell.isDeployed && (
         <p className="text-xs sm:text-sm text-amber-600">
           Farewell is not deployed for the current chain.
@@ -856,3 +867,6 @@ export default function Farewell() {
     </div>
   );
 }
+
+
+
