@@ -4,6 +4,6 @@
   Command: 'npm run genabi'
 */
 export const FarewellAddresses = { 
-  "11155111": { address: "0x8433B93477Fc1a80e216fE52b3b74BC4265207ec", chainId: 11155111, chainName: "sepolia" },
-  "31337": { address: "0x7051eD5Ee5526f02932EDf8C5DdB6F26f8eCEAD1", chainId: 31337, chainName: "hardhat" },
+  "11155111": { address: "0x859be49c6C24bC7800AB02e5A2F188c8C14f23DB", chainId: 11155111, chainName: "sepolia" },
+  "31337": { address: "0x388e4A685c2fc9a70c97EF4f6634f1A1185Ec90d", chainId: 31337, chainName: "hardhat" },
 };
