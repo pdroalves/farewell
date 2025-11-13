@@ -7,6 +7,7 @@ import { useMetaMaskEthersSigner } from "../hooks/metamask/useMetaMaskEthersSign
 import { useFarewell } from "@/hooks/useFarewell";
 import { ethers } from "ethers";
 import TopBar from "@/components/TopBar";
+import Image from "next/image";
 
 import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
 import { MyStatus, NetworkStats } from "@/components/StatsBlocks";
@@ -269,7 +270,7 @@ export default function Farewell() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6 space-y-4 sm:space-y-6 pt-14 sm:pt-16">
       <TopBar
         address={
           ethersSigner ? accounts?.[0] : "No signer" /* string | undefined */
@@ -283,6 +284,51 @@ export default function Farewell() {
         onPing={farewell.isRegistered ? handlePing : undefined} // only show if registered
         pingBusy={pingBusy}
       />
+      
+      {/* Logo - Centered and prominent */}
+      <div className="flex justify-center items-center py-2 sm:py-4">
+        <Image
+          src="/farewell-logo.png"
+          alt="Farewell Logo"
+          width={200}
+          height={200}
+          className="h-[125px] w-auto sm:h-[166px] md:h-52"
+          priority
+        />
+      </div>
+      
+      {/* Proof of Concept Warning */}
+      <Callout variant="danger" title="⚠️ Proof of Concept - Important Notice">
+        <div className="space-y-2 text-sm">
+          <p>
+            <strong>This is a proof of concept implementation</strong> running on Sepolia with FHEVM testnet. 
+            <strong className="text-rose-900"> Do not use this for real data.</strong>
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong>Data loss risk:</strong> Your data can be lost at any moment. 
+              This is experimental software and should not be used for production purposes.
+            </li>
+            <li>
+              <strong>Incomplete protocol:</strong> The data recovery protocol is not complete 
+              and still needs significant work before it can be considered production-ready.
+            </li>
+          </ul>
+          <p className="pt-2 border-t border-rose-300">
+            <strong>Want to help bring this project to life?</strong> We welcome contributions! 
+            Check out our{" "}
+            <a
+              href="https://github.com/pdroalves/farewell-core"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold hover:text-rose-900"
+            >
+              GitHub repository
+            </a>
+            {" "}to contribute financially, with code, or share your ideas.
+          </p>
+        </div>
+      </Callout>
       {/* Toggle button */}
       {/* <div className="flex justify-end">
         <button

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import Image from "next/image";
 
 // SEO
 export const metadata: Metadata = {
@@ -24,17 +23,6 @@ export default function RootLayout({
 
         {/* Fluid container on mobile; constrain only by max-width */}
         <main className="flex flex-col w-full max-w-screen-lg mx-auto pb-20 px-4 sm:px-6">
-          <nav className="flex w-full h-fit py-2 items-center">
-            <Image
-              src={`${prefix}/farewell-logo.png`}
-              alt="Farewell Logo"
-              width={120}
-              height={120}
-              className="h-10 w-auto sm:h-12"
-              priority
-            />
-          </nav>
-
           <Providers>{children}</Providers>
         </main>
       </body>
