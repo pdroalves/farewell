@@ -75,6 +75,22 @@ export const FarewellABI = {
       "type": "error"
     },
     {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "handle",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        }
+      ],
+      "name": "SenderNotAllowedToUseHandle",
+      "type": "error"
+    },
+    {
       "inputs": [],
       "name": "UUPSUnauthorizedCallContext",
       "type": "error"
@@ -88,6 +104,11 @@ export const FarewellABI = {
         }
       ],
       "name": "UUPSUnsupportedProxiableUUID",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZamaProtocolUnsupported",
       "type": "error"
     },
     {
@@ -400,6 +421,19 @@ export const FarewellABI = {
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "confidentialProtocolId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -522,6 +556,13 @@ export const FarewellABI = {
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "initializeV2",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "address",
@@ -590,19 +631,6 @@ export const FarewellABI = {
       "name": "ping",
       "outputs": [],
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "protocolId",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "pure",
       "type": "function"
     },
     {

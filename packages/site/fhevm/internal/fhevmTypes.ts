@@ -19,6 +19,7 @@ export type FhevmRelayerSDKType = {
   initSDK: FhevmInitSDKType;
   createInstance: (config: FhevmInstanceConfig) => Promise<FhevmInstance>;
   SepoliaConfig: FhevmInstanceConfig;
+  MainnetConfig?: FhevmInstanceConfig;
   __initialized__?: boolean;
 };
 export type FhevmWindowType = {

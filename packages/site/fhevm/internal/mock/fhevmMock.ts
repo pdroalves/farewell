@@ -20,19 +20,26 @@ export const fhevmMockCreateInstance = async (parameters: {
   };
 }): Promise<FhevmInstance> => {
   const provider = new JsonRpcProvider(parameters.rpcUrl);
-  const instance = await MockFhevmInstance.create(provider, provider, {
-    //aclContractAddress: "0x50157CFfD6bBFA2DECe204a89ec419c23ef5755D",
-    aclContractAddress: parameters.metadata.ACLAddress,
-    chainId: parameters.chainId,
-    gatewayChainId: 55815,
-    // inputVerifierContractAddress: "0x901F8942346f7AB3a01F6D7613119Bca447Bb030",
-    // kmsContractAddress: "0x1364cBBf2cDF5032C47d8226a6f6FBD2AFCDacAC",
-    inputVerifierContractAddress: parameters.metadata.InputVerifierAddress,
-    kmsContractAddress: parameters.metadata.KMSVerifierAddress,
-    verifyingContractAddressDecryption:
-      "0x5ffdaAB0373E62E2ea2944776209aEf29E631A64",
-    verifyingContractAddressInputVerification:
-      "0x812b06e1CDCE800494b79fFE4f925A504a9A9810",
-  });
+  // v0.3 API: MockFhevmInstance.create now requires a 4th properties argument
+  const instance = await MockFhevmInstance.create(
+    provider,
+    provider,
+    {
+      aclContractAddress: parameters.metadata.ACLAddress,
+      chainId: parameters.chainId,
+      gatewayChainId: 55815,
+      inputVerifierContractAddress: parameters.metadata.InputVerifierAddress,
+      kmsContractAddress: parameters.metadata.KMSVerifierAddress,
+      verifyingContractAddressDecryption:
+        "0x5ffdaAB0373E62E2ea2944776209aEf29E631A64",
+      verifyingContractAddressInputVerification:
+        "0x812b06e1CDCE800494b79fFE4f925A504a9A9810",
+    },
+    {
+      // Empty properties - will be auto-fetched from contracts
+      inputVerifierProperties: {},
+      kmsVerifierProperties: {},
+    }
+  );
   return instance;
 };

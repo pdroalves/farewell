@@ -1,13 +1,8 @@
 import { isAddress, Eip1193Provider, JsonRpcProvider } from "ethers";
-import type {
-  FhevmInitSDKOptions,
-  FhevmInitSDKType,
-  FhevmLoadSDKType,
-  FhevmWindowType,
-} from "./fhevmTypes";
-import { isFhevmWindowType, RelayerSDKLoader } from "./RelayerSDKLoader";
 import { publicKeyStorageGet, publicKeyStorageSet } from "./PublicKeyStorage";
 import { FhevmInstance, FhevmInstanceConfig } from "../fhevmTypes";
+// Import SDK from npm package instead of CDN
+import { createInstance, initSDK, SepoliaConfig } from "@zama-fhe/relayer-sdk/web";
 
 export class FhevmReactError extends Error {
   code: string;
@@ -26,31 +21,7 @@ function throwFhevmError(
   throw new FhevmReactError(code, message, cause ? { cause } : undefined);
 }
 
-const isFhevmInitialized = (): boolean => {
-  if (!isFhevmWindowType(window, console.log)) {
-    return false;
-  }
-  return window.relayerSDK.__initialized__ === true;
-};
-
-const fhevmLoadSDK: FhevmLoadSDKType = () => {
-  const loader = new RelayerSDKLoader({ trace: console.log });
-  return loader.load();
-};
-
-const fhevmInitSDK: FhevmInitSDKType = async (
-  options?: FhevmInitSDKOptions
-) => {
-  if (!isFhevmWindowType(window, console.log)) {
-    throw new Error("window.relayerSDK is not available");
-  }
-  const result = await window.relayerSDK.initSDK(options);
-  window.relayerSDK.__initialized__ = result;
-  if (!result) {
-    throw new Error("window.relayerSDK.initSDK failed.");
-  }
-  return true;
-};
+let sdkInitialized = false;
 
 function checkIsAddress(a: unknown): a is `0x${string}` {
   if (typeof a !== "string") {
@@ -260,31 +231,18 @@ export const createFhevmInstance = async (parameters: {
 
   throwIfAborted();
 
-  if (!isFhevmWindowType(window, console.log)) {
-    notify("sdk-loading");
-
-    // throws an error if failed
-    await fhevmLoadSDK();
-    throwIfAborted();
-
-    notify("sdk-loaded");
-  }
-
-  // notify that state === "sdk-loaded"
-
-  if (!isFhevmInitialized()) {
+  // Initialize SDK if not already done
+  if (!sdkInitialized) {
     notify("sdk-initializing");
-
-    // throws an error if failed
-    await fhevmInitSDK();
-    throwIfAborted();
-
+    await initSDK();
+    sdkInitialized = true;
     notify("sdk-initialized");
   }
 
-  const relayerSDK = (window as unknown as FhevmWindowType).relayerSDK;
+  throwIfAborted();
 
-  const aclAddress = relayerSDK.SepoliaConfig.aclContractAddress;
+  // Use SepoliaConfig from npm package (has correct v0.9/v0.10 addresses)
+  const aclAddress = SepoliaConfig.aclContractAddress;
   if (!checkIsAddress(aclAddress)) {
     throw new Error(`Invalid address: ${aclAddress}`);
   }
@@ -293,7 +251,7 @@ export const createFhevmInstance = async (parameters: {
   throwIfAborted();
 
   const config: FhevmInstanceConfig = {
-    ...relayerSDK.SepoliaConfig,
+    ...SepoliaConfig,
     network: providerOrUrl,
     publicKey: pub.publicKey,
     publicParams: pub.publicParams,
@@ -302,7 +260,7 @@ export const createFhevmInstance = async (parameters: {
   // notify that state === "creating"
   notify("creating");
 
-  const instance = await relayerSDK.createInstance(config);
+  const instance = await createInstance(config);
 
   // Save the key even if aborted
   await publicKeyStorageSet(
