@@ -1,13 +1,95 @@
 import { FhevmRelayerSDKType, FhevmWindowType } from "./fhevmTypes";
-import { SDK_CDN_URL } from "./constants";
+import { getSDKCDNUrl, getBasePath } from "./constants";
 
 type TraceType = (message?: unknown, ...optionalParams: unknown[]) => void;
 
 export class RelayerSDKLoader {
   private _trace?: TraceType;
+  private _wasmPatchApplied = false;
 
   constructor(options: { trace?: TraceType }) {
     this._trace = options.trace;
+  }
+
+  /**
+   * Patch WebAssembly loading to account for basePath
+   * The SDK bundle uses absolute paths like "/tfhe_bg.wasm" which don't work with basePath
+   */
+  private _patchWasmLoading(): void {
+    if (this._wasmPatchApplied) {
+      return;
+    }
+    this._wasmPatchApplied = true;
+
+    const basePath = getBasePath();
+    if (!basePath) {
+      // No basePath, no patching needed
+      return;
+    }
+
+    // Patch WebAssembly.instantiateStreaming to rewrite WASM paths
+    const originalInstantiateStreaming = WebAssembly.instantiateStreaming;
+    WebAssembly.instantiateStreaming = async (
+      source: Response | Promise<Response>,
+      importObject?: WebAssembly.Imports
+    ) => {
+      let response: Response;
+      if (source instanceof Promise) {
+        response = await source;
+      } else {
+        response = source;
+      }
+
+      // Check if this is a WASM file request that needs basePath
+      const url = response.url;
+      if (url && (url.endsWith(".wasm") || url.includes(".wasm"))) {
+        // If the URL doesn't already have the basePath, we need to fetch it with basePath
+        if (!url.includes(basePath)) {
+          const wasmPath = url.replace(window.location.origin, "").replace(/^\//, "");
+          const newUrl = `${basePath}/${wasmPath}`;
+          console.log(`[RelayerSDKLoader] Rewriting WASM path: ${url} -> ${newUrl}`);
+          response = await fetch(newUrl);
+        }
+      }
+
+      return originalInstantiateStreaming.call(WebAssembly, response, importObject);
+    };
+
+    // Also patch fetch for WASM files as a fallback
+    const originalFetch = window.fetch;
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      let url: string | undefined;
+      if (typeof input === "string") {
+        url = input;
+      } else if (input instanceof URL) {
+        url = input.href;
+      } else if (input instanceof Request) {
+        url = input.url;
+      }
+      
+      // Check if this is a WASM file request
+      if (url && (url.endsWith(".wasm") || url.includes(".wasm"))) {
+        // If it's an absolute path starting with "/" and doesn't have basePath, add it
+        // Also handle full URLs that point to the same origin
+        const urlObj = new URL(url, window.location.origin);
+        if (urlObj.pathname.startsWith("/") && !urlObj.pathname.startsWith(basePath)) {
+          const newPath = `${basePath}${urlObj.pathname}`;
+          const newUrl = urlObj.origin + newPath + urlObj.search + urlObj.hash;
+          console.log(`[RelayerSDKLoader] Rewriting WASM fetch: ${url} -> ${newUrl}`);
+          
+          // Create new request with updated URL
+          if (input instanceof Request) {
+            return originalFetch.call(window, new Request(newUrl, input), init);
+          } else if (input instanceof URL) {
+            return originalFetch.call(window, new URL(newUrl), init);
+          } else {
+            return originalFetch.call(window, newUrl, init);
+          }
+        }
+      }
+      
+      return originalFetch.call(window, input, init);
+    };
   }
 
   public isLoaded() {
@@ -27,6 +109,10 @@ export class RelayerSDKLoader {
       );
     }
 
+    // Patch WASM loading to account for basePath
+    // The SDK bundle uses absolute paths like "/tfhe_bg.wasm" which don't work with basePath
+    this._patchWasmLoading();
+
     if ("relayerSDK" in window) {
       if (!isFhevmRelayerSDKType(window.relayerSDK, this._trace)) {
         console.log("[RelayerSDKLoader] window.relayerSDK === undefined");
@@ -36,8 +122,9 @@ export class RelayerSDKLoader {
     }
 
     return new Promise((resolve, reject) => {
+      const sdkUrl = getSDKCDNUrl();
       const existingScript = document.querySelector(
-        `script[src="${SDK_CDN_URL}"]`
+        `script[src="${sdkUrl}"]`
       );
       if (existingScript) {
         if (!isFhevmWindowType(window, this._trace)) {
@@ -52,7 +139,7 @@ export class RelayerSDKLoader {
       }
 
       const script = document.createElement("script");
-      script.src = SDK_CDN_URL;
+      script.src = sdkUrl;
       script.type = "text/javascript";
       script.async = true;
 
@@ -61,18 +148,18 @@ export class RelayerSDKLoader {
           console.log("[RelayerSDKLoader] script onload FAILED...");
           reject(
             new Error(
-              `RelayerSDKLoader: Relayer SDK script has been successfully loaded from ${SDK_CDN_URL}, however, the window.relayerSDK object is invalid.`
+              `RelayerSDKLoader: Relayer SDK script has been successfully loaded from ${sdkUrl}, however, the window.relayerSDK object is invalid.`
             )
           );
         }
         resolve();
       };
 
-      script.onerror = () => {
-        console.log("[RelayerSDKLoader] script onerror... ");
+      script.onerror = (error) => {
+        console.log("[RelayerSDKLoader] script onerror... ", error);
         reject(
           new Error(
-            `RelayerSDKLoader: Failed to load Relayer SDK from ${SDK_CDN_URL}`
+            `RelayerSDKLoader: Failed to load Relayer SDK from ${sdkUrl}`
           )
         );
       };

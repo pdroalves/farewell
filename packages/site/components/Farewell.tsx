@@ -8,6 +8,7 @@ import { useFarewell } from "@/hooks/useFarewell";
 import { ethers } from "ethers";
 import TopBar from "@/components/TopBar";
 import Image from "next/image";
+import { getBasePath } from "@/fhevm/internal/constants";
 
 import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
 import { MyStatus, NetworkStats } from "@/components/StatsBlocks";
@@ -288,7 +289,7 @@ export default function Farewell() {
       {/* Logo - Centered and prominent */}
       <div className="flex justify-center items-center py-2 sm:py-4">
         <Image
-          src="/farewell-logo.png"
+          src={`${getBasePath()}/farewell-logo.png`}
           alt="Farewell Logo"
           width={200}
           height={200}
