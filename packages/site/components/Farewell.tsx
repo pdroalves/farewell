@@ -12,6 +12,7 @@ import { getBasePath } from "@/fhevm/internal/constants";
 
 import { randomHex16, hex16ToBigint, bigintToHex16 } from "@/lib/bit128";
 import { MyStatus, NetworkStats } from "@/components/StatsBlocks";
+import { COMMIT_ID } from "@/lib/commit-id";
 
 // ——— Small UI helpers ————————————————————————————————————————————————
 function SectionHeader({
@@ -911,6 +912,13 @@ export default function Farewell() {
           Farewell is not deployed for the current chain.
         </p>
       )}
+
+      {/* Commit ID footer */}
+      <div className="mt-8 pt-4 border-t border-slate-200 text-center">
+        <p className="text-xs text-slate-500">
+          Commit: <code className="font-mono">{COMMIT_ID}</code>
+        </p>
+      </div>
     </div>
   );
 }

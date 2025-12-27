@@ -25,11 +25,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json   # root lockfile
 
       - name: Install deps (root)
-        run: npm ci                                   # installs all workspaces
+        run: npm install                              # installs all workspaces (no lockfile)
 
       - name: Build site (workspace)
         run: npm run -w packages/site build           # runs packages/site build

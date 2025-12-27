@@ -29,6 +29,7 @@ export class RelayerSDKLoader {
 
     // Patch WebAssembly.instantiateStreaming to rewrite WASM paths
     const originalInstantiateStreaming = WebAssembly.instantiateStreaming;
+    // @ts-expect-error - We're patching the WebAssembly API to handle basePath
     WebAssembly.instantiateStreaming = async (
       source: Response | Promise<Response>,
       importObject?: WebAssembly.Imports
